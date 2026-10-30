@@ -253,10 +253,10 @@ color-wars/
 │   │   └── index.ts             # public API
 │   ├── ui/
 │   │   ├── app.ts               # controller: state, moves, restart, save
-│   │   ├── shell.ts             # static markup and element lookup
+│   │   ├── shell.ts             # home, match, and how-to-play markup
 │   │   ├── boardView.ts         # GameState -> 49 buttons, keyboard, ARIA
-│   │   ├── hud.ts               # turn banner and player cards
-│   │   ├── overlay.ts           # result and restart dialogs
+│   │   ├── hud.ts               # plain-text turn status and player cards
+│   │   ├── overlay.ts           # result, restart, and menu dialogs
 │   │   ├── animations.ts        # consumes engine events
 │   │   └── query.ts             # required-element helper
 │   ├── platform/
@@ -315,7 +315,8 @@ type GameEvent =
 - Render the board **from `GameState` only**; never patch individual cells ad
   hoc. This removes the ghost-orb class of bug by construction.
 - Use `events[]` for animation (orb pop, explosion, transfer, win overlay).
-- Own the turn banner, score, restart control, and input locking.
+- Own screen navigation (home, match, how to play), the compact turn status,
+  score cards, dialogs, and input locking.
 - Contain **no rule logic** (no capacity checks, no winner checks).
 
 #### Platform contract
@@ -408,8 +409,8 @@ of Capacitor:
    - invariant checks after every move (owner valid, orbs positive, board
      stable unless a cascade limit was hit);
    - pathological cascades terminate through the step cap.
-6. **UI tests (Phase 2)** — clicking an empty cell always places a coin; a win
-   shows an overlay and locks input; the rendered DOM matches the model after
-   every cascade.
+6. **UI tests (Phase 2)** — the home screen gates the match; clicking an empty
+   cell always places a coin; a win shows an overlay and locks input; the
+   rendered DOM matches the model after every cascade.
 7. **Device tests (Phase 3–4)** — see the matrix in
    [`ANDROID.md`](ANDROID.md#testing-matrix).

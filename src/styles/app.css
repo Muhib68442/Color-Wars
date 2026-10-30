@@ -4,6 +4,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html {
   min-height: 100%;
 }
@@ -20,48 +24,29 @@ body {
 
 h1,
 h2,
+h3,
 p {
   margin: 0;
 }
 
 .app {
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
-  gap: clamp(8px, 1.8vh, 16px);
+  overflow: hidden;
   padding-top: var(--safe-top);
   padding-right: var(--safe-right);
   padding-bottom: var(--safe-bottom);
   padding-left: var(--safe-left);
 }
 
-/* ---------- Navbar ---------- */
-
-.navbar {
+.screen {
+  flex: 1;
+  min-height: 0;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px clamp(12px, 4vw, 24px);
-  background: var(--nav);
-  color: var(--nav-ink);
-  border-bottom-left-radius: var(--radius-lg);
-  border-bottom-right-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-}
-
-.brand__title {
-  font-family: var(--font-display);
-  font-size: clamp(20px, 5vw, 26px);
-  font-weight: 400;
-  letter-spacing: 0.02em;
-}
-
-.brand__tag {
-  margin-top: 2px;
-  font-size: 12px;
-  color: #cfcfd6;
+  flex-direction: column;
+  gap: clamp(8px, 1.6vh, 14px);
 }
 
 /* ---------- Buttons ---------- */
@@ -91,16 +76,6 @@ p {
   outline-offset: 2px;
 }
 
-.btn--ghost {
-  background: rgb(255 255 255 / 12%);
-  color: inherit;
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 22%);
-}
-
-.btn--ghost:hover {
-  background: rgb(255 255 255 / 20%);
-}
-
 .btn--primary {
   background: var(--accent);
   color: #ffffff;
@@ -120,35 +95,149 @@ p {
   background: #e9e9ee;
 }
 
-/* ---------- HUD ---------- */
-
-.hud {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding-inline: clamp(12px, 4vw, 24px);
+.btn--quiet {
+  background: transparent;
+  color: var(--ink-muted);
 }
 
-.turn {  padding: 10px 14px;
-  border-radius: var(--radius-md);
-  border-left: 6px solid var(--line);
-  background: var(--surface);
-  box-shadow: var(--shadow-sm), inset 0 0 0 1px var(--line);
-  font-size: clamp(15px, 4vw, 18px);
+.btn--quiet:hover {
+  background: rgb(20 22 26 / 6%);
+  color: var(--ink);
+}
+
+.btn--large {
+  min-height: 54px;
+  font-size: 16px;
+}
+
+.iconbtn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.15s ease;
+}
+
+.iconbtn:hover {
+  background: rgb(20 22 26 / 6%);
+}
+
+.iconbtn:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.iconbtn svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* ---------- Home ---------- */
+
+.screen--home {
+  align-items: center;
+  justify-content: center;
+  gap: clamp(14px, 3vh, 22px);
+  padding: clamp(20px, 6vw, 44px);
+  text-align: center;
+  overflow-y: auto;
+}
+
+.home__logo {
+  width: clamp(104px, 30vw, 156px);
+}
+
+.logo {
+  display: block;
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 12px 26px rgb(20 22 26 / 16%));
+}
+
+.home__title {
+  font-family: var(--font-display);
+  font-size: clamp(40px, 12vw, 64px);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.01em;
+}
+
+.home__desc {
+  max-width: 36ch;
+  font-size: clamp(14px, 3.7vw, 16px);
+  line-height: 1.55;
+  color: var(--ink-muted);
+}
+
+.home__actions {
+  display: grid;
+  gap: 10px;
+  width: min(320px, 100%);
+  margin-top: 4px;
+}
+
+.home__note {
+  font-size: 12.5px;
+  color: var(--ink-muted);
+}
+
+/* ---------- Game ---------- */
+
+.screen--game {
+  gap: clamp(6px, 1.2vh, 10px);
+}
+
+.gamebar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 2px clamp(10px, 3vw, 20px) 0;
+}
+
+.gamebar__spacer {
+  flex: none;
+  width: 44px;
+  height: 1px;
+}
+
+/* Status is plain text inside the game bar: no panel, no extra height. */
+.turn {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  font-size: clamp(14px, 3.8vw, 16px);
   font-weight: 650;
   text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--ink);
 }
 
 .turn[data-player="1"] {
-  border-left-color: var(--p1);
+  color: var(--p1-strong);
 }
 
 .turn[data-player="2"] {
-  border-left-color: var(--p2);
+  color: var(--p2-strong);
 }
 
 .turn.is-over {
-  border-left-color: var(--nav);
+  color: var(--ink);
 }
 
 .score {
@@ -157,7 +246,7 @@ p {
   justify-content: space-between;
   gap: 8px;
   min-width: 0;
-  padding: 10px 14px;
+  padding: 9px 14px;
   border-radius: var(--radius-md);
   background: var(--surface);
   box-shadow: inset 0 0 0 1px var(--line);
@@ -166,7 +255,7 @@ p {
 
 /* Player 2 sits above the board, Player 1 below it. */
 .score--bar {
-  margin-inline: clamp(12px, 4vw, 24px);
+  margin-inline: clamp(10px, 3vw, 20px);
   border-left: 6px solid var(--line);
 }
 
@@ -245,6 +334,7 @@ p {
   display: grid;
   place-items: center;
   flex: 1;
+  min-height: 0;
   padding-inline: clamp(8px, 3vw, 16px);
 }
 
@@ -420,14 +510,61 @@ p {
   --y: 1;
 }
 
-/* ---------- Hint ---------- */
+/* ---------- How to play ---------- */
 
-.hint {
-  padding: 0 clamp(16px, 5vw, 24px) 16px;
-  font-size: 12.5px;
-  line-height: 1.5;
+.screen--info {
+  gap: 0;
+}
+
+.infobar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 2px clamp(10px, 3vw, 20px) 0;
+}
+
+.infobar__title {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-size: clamp(20px, 5vw, 24px);
+  font-weight: 400;
   text-align: center;
+}
+
+.info {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: 680px;
+  margin-inline: auto;
+  padding: 8px clamp(18px, 5vw, 28px) calc(28px + var(--safe-bottom));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  line-height: 1.6;
+}
+
+.info__lead {
   color: var(--ink-muted);
+}
+
+.info h3 {
+  margin: 22px 0 6px;
+  font-family: var(--font-display);
+  font-size: clamp(17px, 4.4vw, 20px);
+  font-weight: 400;
+}
+
+.info ul {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0 0;
+  padding-left: 1.25em;
+}
+
+.info li {
+  line-height: 1.5;
 }
 
 /* ---------- Overlay ---------- */
@@ -501,30 +638,67 @@ p {
 }
 
 @media (max-width: 380px) {
-  .brand__tag {
-    display: none;
+  .home__desc {
+    font-size: 13.5px;
+  }
+
+  .score__stats {
+    gap: 2px 8px;
+    font-size: 11px;
   }
 }
 
 @media (orientation: landscape) and (max-height: 560px) {
-  .app {
-    gap: 6px;
+  .screen {
+    gap: 4px;
   }
 
-  .navbar {
-    padding-block: 8px;
+  .gamebar,
+  .infobar {
+    min-height: 36px;
+    padding-top: 0;
   }
 
-  .brand__tag,
-  .hint {
-    display: none;
+  .iconbtn {
+    width: 36px;
+    height: 36px;
   }
 
-  .score--bar {
-    padding-block: 6px;
+  .gamebar__spacer {
+    width: 36px;
+  }
+
+  .score {
+    padding-block: 5px;
   }
 
   .board {
-    width: min(80vw, 58vh, 420px);
+    width: min(80vw, 62vh, 420px);
+  }
+
+  .screen--home {
+    gap: 10px;
+    padding-block: 12px;
+  }
+
+  .home__logo {
+    width: 72px;
+  }
+
+  .home__title {
+    font-size: clamp(24px, 5vw, 34px);
+  }
+
+  .home__desc {
+    display: none;
+  }
+
+  .home__actions {
+    grid-auto-flow: column;
+    width: auto;
+  }
+
+  .info h3 {
+    margin-top: 16px;
   }
 }

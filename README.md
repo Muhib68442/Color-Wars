@@ -9,10 +9,10 @@ The **web implementation is the product**. It will ship as an Android app built
 with Capacitor (see [`docs/ANDROID.md`](docs/ANDROID.md)). The Pygame prototype
 in `legacy/main.py` is archived for reference and is no longer maintained.
 
-> **Status: playable web build.** The pure engine, the new UI, and save/resume
-> are complete and covered by 49 Vitest tests. Phase 3 wraps the Vite build in a
-> Capacitor Android shell; Phase 4 handles signing and release. See the
-> [roadmap](#roadmap).
+> **Status: playable web build.** The pure engine, the home/menu UI, and
+> save/resume are complete and covered by 58 Vitest tests. Phase 3 wraps the
+> Vite build in a Capacitor Android shell; Phase 4 handles signing and release.
+> See the [roadmap](#roadmap).
 
 ---
 
@@ -49,9 +49,12 @@ work happens on the web/Android build.
   neighbour, converting enemy orbs to the exploding player.
 - Cascades resolve automatically. A player with no orbs left loses.
 
-The active player's panel is highlighted and the turn banner names them. When
-the game ends, a result dialog appears and the board is locked until you start a
-new game. See [`docs/UI.md`](docs/UI.md).
+The app opens on a home screen with **Play**, **New game** (when a match is
+saved), and **How to play**. **Play** opens the match; the active player's panel
+is highlighted and the compact game bar names them. The in-match menu offers
+How to play, Restart, and Back to home. When the game ends, a result dialog
+appears and the board is locked until you start a new game. See
+[`docs/UI.md`](docs/UI.md).
 
 ---
 
@@ -95,7 +98,7 @@ Phase 3 target and does not exist yet.
 
 ```powershell
 npm ci
-npm test               # 49 engine, storage, and UI tests
+npm test               # 58 engine, storage, and UI tests
 npm run typecheck
 npm run build          # Vite production build in dist/
 npx cap sync android   # Phase 3

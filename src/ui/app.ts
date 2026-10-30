@@ -12,9 +12,7 @@ import { createHud } from "./hud.js";
 import { createOverlay } from "./overlay.js";
 import { mountShell } from "./shell.js";
 
-const PLAY_HINT =
-  "Tap an empty cell or one of your own. Corners pop at 2 orbs, edges at 3, the middle at 4.";
-const OVER_HINT = "Game over. Start a new game to play again.";
+export type ScreenName = "home" | "game" | "info";
 
 export interface AppOptions {
   storage: StorageAdapter;
@@ -23,6 +21,7 @@ export interface AppOptions {
 
 export interface App {
   getState(): GameState;
+  getScreen(): ScreenName;
   selectCell(ref: CellRef): boolean;
   newGame(): void;
   requestNewGame(): void;
@@ -34,6 +33,8 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
   const { storage, haptics } = options;
 
   let state = storage.load() ?? createGame();
+  let screen: ScreenName = "home";
+  let infoReturn: "home" | "game" = "home";
 
   const board = createBoardView(shell.board, (ref) => {
     selectCell(ref);
@@ -42,13 +43,53 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
   const hud = createHud({ status: shell.status, scores: shell.scores });
 
   const overlay = createOverlay(shell.overlay, () => {
-    board.focusDefault();
+    if (screen === "game") board.focusDefault();
   });
 
   function render(): void {
     board.render(state);
     hud.render(state);
-    shell.hint.textContent = state.gameOver ? OVER_HINT : PLAY_HINT;
+    updateHome();
+  }
+
+  function updateHome(): void {
+    const resumable = state.moveCount > 0 && !state.gameOver;
+
+    shell.playButton.textContent = state.gameOver
+      ? "Play again"
+      : resumable
+        ? "Continue"
+        : "Play";
+    shell.newGameButton.hidden = !resumable;
+
+    if (state.gameOver) {
+      shell.saveNote.hidden = false;
+      shell.saveNote.textContent =
+        state.winner === null
+          ? "Last game ended in a draw."
+          : `Last game: Player ${state.winner} won.`;
+    } else if (resumable) {
+      shell.saveNote.hidden = false;
+      shell.saveNote.textContent = `Saved game · Player ${state.currentPlayer} to move`;
+    } else {
+      shell.saveNote.hidden = true;
+      shell.saveNote.textContent = "";
+    }
+  }
+
+  function showScreen(next: ScreenName): void {
+    screen = next;
+    shell.home.hidden = next !== "home";
+    shell.game.hidden = next !== "game";
+    shell.info.hidden = next !== "info";
+
+    if (next === "home") {
+      shell.playButton.focus();
+    } else if (next === "info") {
+      shell.infoBack.focus();
+    } else {
+      board.focusDefault();
+    }
   }
 
   function showResult(): void {
@@ -62,17 +103,29 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
           ? "The cascade hit its safety limit, so the game ends level."
           : `Player ${winner} controls every orb left on the board.`,
       actions: [
-        { label: "Play again", variant: "primary", run: newGame },
         {
-          label: "View board",
+          label: "Play again",
+          variant: "primary",
+          run: () => {
+            newGame();
+            showScreen("game");
+          },
+        },
+        {
+          label: "Back to home",
           variant: "secondary",
-          run: () => overlay.close(),
+          run: () => {
+            overlay.close();
+            showScreen("home");
+          },
         },
       ],
     });
   }
 
   function selectCell(ref: CellRef): boolean {
+    if (screen !== "game" || overlay.isOpen()) return false;
+
     const result = applyMove(state, ref);
 
     if (!result.accepted) {
@@ -95,12 +148,17 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
     state = createGame();
     storage.clear();
     render();
-    board.focusDefault();
+  }
+
+  function startMatch(): void {
+    if (state.gameOver) newGame();
+    showScreen("game");
   }
 
   function requestNewGame(): void {
     if (state.moveCount === 0 || state.gameOver) {
       newGame();
+      showScreen("game");
       return;
     }
 
@@ -109,7 +167,14 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
       title: "Start over?",
       body: "The current game will be lost.",
       actions: [
-        { label: "Start over", variant: "primary", run: newGame },
+        {
+          label: "Start over",
+          variant: "primary",
+          run: () => {
+            newGame();
+            showScreen("game");
+          },
+        },
         {
           label: "Keep playing",
           variant: "secondary",
@@ -119,13 +184,69 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
     });
   }
 
-  shell.restartButton.addEventListener("click", requestNewGame);
+  function openMenu(): void {
+    overlay.open({
+      eyebrow: "Game menu",
+      title: "Paused",
+      body: state.gameOver
+        ? "The game is over. Start a new one or return home."
+        : `Player ${state.currentPlayer} to move.`,
+      actions: [
+        {
+          label: "How to play",
+          variant: "primary",
+          run: () => {
+            overlay.close();
+            infoReturn = "game";
+            showScreen("info");
+          },
+        },
+        {
+          label: "Restart match",
+          run: () => {
+            overlay.close();
+            requestNewGame();
+          },
+        },
+        {
+          label: "Back to home",
+          run: () => {
+            overlay.close();
+            showScreen("home");
+          },
+        },
+        {
+          label: "Keep playing",
+          run: () => overlay.close(),
+        },
+      ],
+    });
+  }
+
+  shell.playButton.addEventListener("click", startMatch);
+
+  shell.newGameButton.addEventListener("click", () => {
+    newGame();
+    showScreen("game");
+  });
+
+  shell.howToButton.addEventListener("click", () => {
+    infoReturn = "home";
+    showScreen("info");
+  });
+
+  shell.menuButton.addEventListener("click", openMenu);
+
+  shell.infoBack.addEventListener("click", () => {
+    showScreen(infoReturn);
+  });
 
   render();
-  if (state.gameOver) showResult();
+  showScreen("home");
 
   return {
     getState: () => state,
+    getScreen: () => screen,
     selectCell,
     newGame,
     requestNewGame,

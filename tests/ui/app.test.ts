@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyMove,
+  createGame,
   setCell,
 } from "../../src/engine/index.js";
 import { cell, emptyBoard, makeState } from "../engine/helpers.js";
@@ -27,12 +28,24 @@ function mount(seed?: GameState) {
   return { root, app, store, storage };
 }
 
+function button(root: HTMLElement, action: string): HTMLButtonElement {
+  const element = root.querySelector<HTMLButtonElement>(
+    `[data-action='${action}']`,
+  );
+  if (element === null) throw new Error(`Missing button: ${action}`);
+  return element;
+}
+
+function startMatch(root: HTMLElement): void {
+  button(root, "play").click();
+}
+
 function cellButton(root: HTMLElement, row: number, col: number): HTMLButtonElement {
-  const button = root.querySelector<HTMLButtonElement>(
+  const element = root.querySelector<HTMLButtonElement>(
     `button.cell[data-row="${row}"][data-col="${col}"]`,
   );
-  if (button === null) throw new Error(`Missing cell ${row},${col}`);
-  return button;
+  if (element === null) throw new Error(`Missing cell ${row},${col}`);
+  return element;
 }
 
 function status(root: HTMLElement): string {
@@ -60,22 +73,115 @@ function overlayActions(root: HTMLElement): HTMLButtonElement[] {
 }
 
 function action(root: HTMLElement, label: string): HTMLButtonElement {
-  const button = overlayActions(root).find(
+  const element = overlayActions(root).find(
     (candidate) => candidate.textContent === label,
   );
-  if (button === undefined) throw new Error(`Missing overlay action: ${label}`);
-  return button;
+  if (element === undefined) throw new Error(`Missing overlay action: ${label}`);
+  return element;
 }
 
 function orbsOn(root: HTMLElement, row: number, col: number): number {
   return Number(cellButton(root, row, col).dataset.orbs);
 }
 
+function screenIs(root: HTMLElement, name: "home" | "game" | "info"): boolean {
+  const screen = root.querySelector<HTMLElement>(`[data-role='${name}']`);
+  return screen !== null && !screen.hidden;
+}
+
+describe("home screen", () => {
+  it("boots on the home screen with logo, title, and actions", () => {
+    const { root, app } = mount();
+
+    expect(app.getScreen()).toBe("home");
+    expect(screenIs(root, "home")).toBe(true);
+    expect(screenIs(root, "game")).toBe(false);
+    expect(screenIs(root, "info")).toBe(false);
+    expect(root.querySelector(".home__logo svg")).not.toBeNull();
+    expect(root.querySelector(".home__title")?.textContent).toBe("Color Wars");
+    expect(button(root, "play").textContent).toBe("Play");
+    expect(button(root, "new-game").hidden).toBe(true);
+    expect(root.querySelector("[data-role='save-note']")?.textContent).toBe("");
+  });
+
+  it("opens the match when Play is pressed", () => {
+    const { root, app } = mount();
+
+    startMatch(root);
+
+    expect(app.getScreen()).toBe("game");
+    expect(screenIs(root, "game")).toBe(true);
+    expect(screenIs(root, "home")).toBe(false);
+    expect(status(root)).toBe("Player 1 to move");
+  });
+
+  it("shows Continue and a saved-game note when a save exists", () => {
+    const saved = applyMove(createGame(), { row: 0, col: 0 }).state;
+    const { root } = mount(saved);
+
+    expect(button(root, "play").textContent).toBe("Continue");
+    expect(button(root, "new-game").hidden).toBe(false);
+    expect(root.querySelector("[data-role='save-note']")?.textContent).toContain(
+      "Saved game",
+    );
+
+    startMatch(root);
+    expect(status(root)).toBe("Player 2 to move");
+  });
+
+  it("starts a fresh match when New game is pressed", () => {
+    const saved = applyMove(createGame(), { row: 0, col: 0 }).state;
+    const { root, app } = mount(saved);
+
+    button(root, "new-game").click();
+
+    expect(app.getScreen()).toBe("game");
+    expect(app.getState().moveCount).toBe(0);
+    expect(status(root)).toBe("Player 1 to move");
+  });
+});
+
+describe("how to play", () => {
+  it("opens from home and returns home", () => {
+    const { root, app } = mount();
+
+    button(root, "how-to").click();
+
+    expect(app.getScreen()).toBe("info");
+    expect(screenIs(root, "info")).toBe(true);
+    expect(
+      root.querySelector("#info-title")?.textContent,
+    ).toBe("How to play");
+
+    button(root, "info-back").click();
+    expect(app.getScreen()).toBe("home");
+  });
+
+  it("opens from the game menu and returns to the match", () => {
+    const { root, app } = mount();
+    startMatch(root);
+
+    button(root, "menu").click();
+    expect(overlay(root).hasAttribute("open")).toBe(true);
+    expect(overlayTitle(root)).toBe("Paused");
+
+    action(root, "How to play").click();
+
+    expect(overlay(root).hasAttribute("open")).toBe(false);
+    expect(app.getScreen()).toBe("info");
+
+    button(root, "info-back").click();
+    expect(app.getScreen()).toBe("game");
+  });
+});
+
 describe("app shell", () => {
   it("renders a 7x7 board, scores, and a visible turn banner", () => {
     const { root } = mount();
+    startMatch(root);
 
     expect(root.querySelectorAll("button.cell")).toHaveLength(49);
+    expect(root.querySelector(".gamebar [data-role='status']")).not.toBeNull();
     expect(status(root)).toBe("Player 1 to move");
     expect(cellButton(root, 0, 0).getAttribute("aria-label")).toBe(
       "Row 1, column 1, empty",
@@ -87,6 +193,7 @@ describe("app shell", () => {
 
   it("puts Player 2 above the board and Player 1 below it", () => {
     const { root } = mount();
+    startMatch(root);
 
     const order = Array.from(
       root.querySelectorAll<HTMLElement>(".score, .board"),
@@ -97,6 +204,7 @@ describe("app shell", () => {
 
   it("keeps exactly one tab stop on the board", () => {
     const { root } = mount();
+    startMatch(root);
     cellButton(root, 2, 3).focus();
 
     expect(cellButton(root, 2, 3).tabIndex).toBe(0);
@@ -104,11 +212,20 @@ describe("app shell", () => {
       root.querySelectorAll("button.cell[tabindex='0']"),
     ).toHaveLength(1);
   });
+
+  it("does not place orbs while on the home screen", () => {
+    const { root, app } = mount();
+
+    cellButton(root, 0, 0).click();
+
+    expect(app.getState().moveCount).toBe(0);
+  });
 });
 
 describe("placing orbs", () => {
   it("places a coin on an empty cell and swaps the turn", () => {
     const { root, app } = mount();
+    startMatch(root);
 
     cellButton(root, 0, 0).click();
 
@@ -120,6 +237,7 @@ describe("placing orbs", () => {
 
   it("still allows a new placement after both opening moves", () => {
     const { root, app } = mount();
+    startMatch(root);
 
     cellButton(root, 0, 0).click();
     cellButton(root, 6, 6).click();
@@ -131,6 +249,7 @@ describe("placing orbs", () => {
 
   it("ignores a click on an enemy cell", () => {
     const { root, app } = mount();
+    startMatch(root);
 
     cellButton(root, 0, 0).click();
     cellButton(root, 6, 6).click();
@@ -146,6 +265,7 @@ describe("placing orbs", () => {
 
   it("moves focus with the arrow keys", () => {
     const { root } = mount();
+    startMatch(root);
 
     cellButton(root, 0, 0).focus();
     cellButton(root, 0, 0).dispatchEvent(
@@ -164,6 +284,7 @@ describe("winning", () => {
     const seed = makeState(board, { currentPlayer: 1 });
 
     const { root, app } = mount(seed);
+    startMatch(root);
     cellButton(root, 0, 0).click();
 
     expect(app.getState().gameOver).toBe(true);
@@ -179,21 +300,40 @@ describe("winning", () => {
     action(root, "Play again").click();
 
     expect(overlay(root).hasAttribute("open")).toBe(false);
+    expect(app.getScreen()).toBe("game");
     expect(app.getState().moveCount).toBe(0);
     expect(status(root)).toBe("Player 1 to move");
     expect(root.querySelectorAll("button.cell[data-orbs='0']")).toHaveLength(49);
   });
-});
 
-describe("restart", () => {
-  it("asks before discarding a game in progress", () => {
-    const { root, app } = mount();
+  it("returns home from the result dialog", () => {
+    const board = emptyBoard(7, 7);
+    setCell(board, 0, 0, cell(1, 1));
+    setCell(board, 0, 1, cell(2, 1));
+    const seed = makeState(board, { currentPlayer: 1 });
+
+    const { root, app } = mount(seed);
+    startMatch(root);
     cellButton(root, 0, 0).click();
 
-    const restart = root.querySelector<HTMLButtonElement>(
-      "[data-action='restart']",
+    action(root, "Back to home").click();
+
+    expect(app.getScreen()).toBe("home");
+    expect(button(root, "play").textContent).toBe("Play again");
+    expect(root.querySelector("[data-role='save-note']")?.textContent).toBe(
+      "Last game: Player 1 won.",
     );
-    restart?.click();
+  });
+});
+
+describe("game menu", () => {
+  it("asks before discarding a game in progress", () => {
+    const { root, app } = mount();
+    startMatch(root);
+    cellButton(root, 0, 0).click();
+
+    button(root, "menu").click();
+    action(root, "Restart match").click();
 
     expect(overlay(root).hasAttribute("open")).toBe(true);
     expect(overlayTitle(root)).toBe("Start over?");
@@ -202,17 +342,32 @@ describe("restart", () => {
     expect(overlay(root).hasAttribute("open")).toBe(false);
     expect(app.getState().moveCount).toBe(1);
 
-    restart?.click();
+    button(root, "menu").click();
+    action(root, "Restart match").click();
     action(root, "Start over").click();
 
     expect(app.getState().moveCount).toBe(0);
     expect(orbsOn(root, 0, 0)).toBe(0);
+  });
+
+  it("returns home and keeps the saved game", () => {
+    const { root, app } = mount();
+    startMatch(root);
+    cellButton(root, 0, 0).click();
+
+    button(root, "menu").click();
+    action(root, "Back to home").click();
+
+    expect(app.getScreen()).toBe("home");
+    expect(button(root, "play").textContent).toBe("Continue");
+    expect(app.getState().moveCount).toBe(1);
   });
 });
 
 describe("save and resume", () => {
   it("restores the board and turn after a reload", () => {
     const { root, store } = mount();
+    startMatch(root);
     cellButton(root, 0, 0).click();
     cellButton(root, 6, 6).click();
 
@@ -221,10 +376,14 @@ describe("save and resume", () => {
     if (nextRoot === null) throw new Error("Missing #app");
     const app = createApp(nextRoot, { storage: createStorage(store) });
 
+    expect(app.getScreen()).toBe("home");
     expect(app.getState().moveCount).toBe(2);
     expect(app.getState().currentPlayer).toBe(1);
     expect(orbsOn(nextRoot, 0, 0)).toBe(1);
     expect(orbsOn(nextRoot, 6, 6)).toBe(1);
+
+    startMatch(nextRoot);
+    expect(status(nextRoot)).toBe("Player 1 to move");
   });
 
   it("starts fresh when the save is corrupt", () => {
@@ -241,7 +400,7 @@ describe("save and resume", () => {
     expect(store.getItem(SAVE_KEY)).toBeNull();
   });
 
-  it("restores a finished game and shows the result", () => {
+  it("offers a replay for a finished saved game", () => {
     const board = emptyBoard(7, 7);
     setCell(board, 0, 0, cell(1, 1));
     setCell(board, 0, 1, cell(2, 1));
@@ -250,9 +409,17 @@ describe("save and resume", () => {
       { row: 0, col: 0 },
     ).state;
 
-    const { root } = mount(finished);
+    const { root, app } = mount(finished);
 
-    expect(overlay(root).hasAttribute("open")).toBe(true);
-    expect(overlayTitle(root)).toBe("Player 1 wins");
+    expect(app.getScreen()).toBe("home");
+    expect(button(root, "play").textContent).toBe("Play again");
+    expect(root.querySelector("[data-role='save-note']")?.textContent).toBe(
+      "Last game: Player 1 won.",
+    );
+
+    startMatch(root);
+    expect(app.getScreen()).toBe("game");
+    expect(app.getState().moveCount).toBe(0);
+    expect(overlay(root).hasAttribute("open")).toBe(false);
   });
 });
