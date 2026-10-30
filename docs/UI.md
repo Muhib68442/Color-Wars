@@ -1,10 +1,11 @@
 # User Interface
 
-This document describes the web interface in `index.html` and `style.css`,
-including layout geometry, components, visual states, and accessibility. It
-reflects the current implementation and calls out visual defects separately.
+This document describes the current web UI: layout, DOM structure, design
+tokens, components, visual states, interaction, responsiveness, and
+accessibility. The UI is implemented in `src/ui/` and `src/styles/`.
 
-The Pygame window is a separate UI and is summarised at the end.
+The Pygame prototype in `legacy/main.py` is archived; its window is summarised
+at the end for reference.
 
 ---
 
@@ -12,254 +13,297 @@ The Pygame window is a separate UI and is summarised at the end.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  header.navbar                              Color Wars   [*] │  dark bar (#333), rounded bottom corners
+│  header.navbar                              Color Wars  [New game] │  dark bar (#333)
 ├──────────────────────────────────────────────────────────────┤
-│  section.player-progress                                     │
-│  ┌───────────────────────────┐  ┌───────────────────────────┐│
-│  │ .player.player1c          │  │ .player.player2c          ││
-│  │  ┌─────────────────────┐  │  │  ┌─────────────────────┐  ││
-│  │  │ Player 1            │  │  │  │ Player 2            │  ││
-│  │  │ [progress 0──49]    │  │  │  │ [progress 0──49]    │  ││
-│  │  └─────────────────────┘  │  │  └─────────────────────┘  ││
-│  └───────────────────────────┘  └───────────────────────────┘│
-│                                                              │
-│  #turn  "Player 1's Turn"          ← display: none (hidden)  │
-│                                                              │
-│  main                                                        │
-│    #game-board  (7×7 CSS grid, 50 px tracks, 2 px gap)       │
-│      .cell .cell .cell .cell .cell .cell .cell               │
-│      ...                                                     │
+│  section.hud                                                 │
+│    p.turn   "Player 2 to move"                               │  live status, player-coloured edge
+├──────────────────────────────────────────────────────────────┤
+│  article.score[data-player="2"]   Player 2   · 3 cells · 5 orbs │  top player
+├──────────────────────────────────────────────────────────────┤
+│  main.stage                                                  │
+│    div.board  (7×7 CSS grid, square, centred)                │
+│      button.cell ×49                                         │
+├──────────────────────────────────────────────────────────────┤
+│  article.score[data-player="1"]   Player 1   · 2 cells · 4 orbs │  bottom player
+├──────────────────────────────────────────────────────────────┤
+│  p.hint   "Tap an empty cell or one of your own…"            │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-The page is vertically stacked: navbar → player panels → (hidden) turn label →
-board. There is no footer, menu, modal, or settings UI.
+The player panels are positionally fixed to the players, not to the turn:
+
+| Player | Position | Why |
+| --- | --- | --- |
+| Player 2 | **above** the board | Opponent side of the table |
+| Player 1 | **below** the board | Near side / the player who starts |
+
+The board is centred between the two panels. `main.stage` is `flex: 1`, so the
+bottom panel is pushed to the bottom of the viewport on tall screens and the
+layout stays balanced on short ones.
+
+The turn banner sits directly under the navbar. It is always visible, unlike
+the legacy `#turn` element which was `display: none`.
 
 ---
 
 ## 2. DOM structure
 
+`src/ui/shell.ts` writes this template into `#app`; `src/main.ts` only boots the
+controller.
+
 ```
 body
-├── header.navbar
-│   ├── h1                 "Color Wars"
-│   └── div.links > a      "*" (href="#", placeholder)
-├── section.player-progress
-│   ├── div.player.player1c
-│   │   └── div.p1p
-│   │       ├── h3         "Player 1"
-│   │       └── progress   value=0 max=49
-│   └── div.player.player2c
-│       └── div.p2p
-│           ├── h3         "Player 2"
-│           └── progress   value=0 max=49
-├── div#turn               "Player 1's Turn"  (display: none)
-└── main
-    └── div#game-board
-        └── 49 × div.cell[data-row][data-col]
-            └── 0–3 × div.dot
+└── div#app.app
+    ├── header.navbar
+    │   ├── div.brand
+    │   │   ├── h1.brand__title        "Color Wars"
+    │   │   └── p.brand__tag           "Two players, one device"
+    │   └── button.btn.btn--ghost[data-action="restart"]   "New game"
+    ├── section.hud[aria-label="Game status"]
+    │   └── p.turn[role="status"][aria-live="polite"][data-role="status"]
+    ├── article.score.score--bar[data-player="2"][aria-label="Player 2 score"]
+    │   ├── h2.score__name             "Player 2"
+    │   └── p.score__stats
+    │       ├── span > b[data-role="cells"]  + " cells"
+    │       └── span > b[data-role="orbs"]   + " orbs"
+    ├── main.stage
+    │   └── div.board[data-role="board"][role="group"][aria-label="Board, 7 by 7"]
+    │       └── 49 × button.cell[data-row][data-col][data-orbs][data-capacity]
+    │           └── 4 × span.orb[aria-hidden="true"]
+    ├── article.score.score--bar[data-player="1"][aria-label="Player 1 score"]
+    └── p.hint[data-role="hint"]
+dialog.overlay[aria-labelledby="overlay-title"]
+    └── div.overlay__card
+        ├── p.overlay__eyebrow
+        ├── h2.overlay__title
+        ├── p.overlay__body
+        └── div.overlay__actions      (buttons built at runtime)
 ```
 
-Cells are generated by `createBoard()` at runtime; the HTML ships an empty
-`#game-board`.
+Every cell is a real `<button>`. The four orb spans are decorative
+(`aria-hidden`); the button's `aria-label` carries the state, for example:
+
+- `Row 3, column 4, empty`
+- `Row 3, column 4, Player 1, 2 of 4 orbs`
+
+The board is `role="group"` rather than `role="grid"` because each item is
+already a focusable button; this avoids a broken grid/gridcell hierarchy.
 
 ---
 
 ## 3. Design tokens
 
-Defined in `:root` in `style.css`:
+Defined in `src/styles/tokens.css`.
 
 | Token | Value | Used for |
 | --- | --- | --- |
-| `--bg` | `#e2e2e2` | Page/board background, player panels |
-| `--bg-x` | `#333` | Navbar |
-| `--theme` | `#1176ff` | Winner highlight (intended) |
-| `--text` | `#000` | Player headings |
-| `--text-i` | `#fff` | Navbar text |
-| `--dot` | `#000` | Orb dots |
-| `--p1` | `var(--blue)` → `#6e6eff` | Player 1 cells and active panel |
-| `--p2` | `var(--red)` → `#ff5959` | Player 2 cells and active panel |
-| `--box` | `var(--bg)` | Empty cell background |
-| `--red` | `#ff5959` | Player 2 |
-| `--green` | `#4eec4ee7` | Unused |
-| `--blue` | `#6e6eff` | Player 1 |
-| `--yellow` | `#ffff74` | Unused |
-| `--white` | `#fff` | Unused |
-| `--ff` | `'customFont', sans-serif` | Navbar title, player headings |
+| `--bg` | `#e6e6ea` | Page background |
+| `--surface` | `#ffffff` | Cards, status bar, board frame, dialog |
+| `--surface-sunken` | `#f3f3f6` | Secondary buttons |
+| `--nav` | `#333333` | Navbar |
+| `--nav-ink` | `#ffffff` | Navbar text |
+| `--ink` | `#14161a` | Primary text, Player 1 orbs |
+| `--ink-muted` | `#5b5f69` | Secondary text, hints |
+| `--line` | `#cfd0d6` | Borders and inset rings |
+| `--p1` | `#6e6eff` | Player 1 fill |
+| `--p1-soft` | `#ececff` | Active Player 1 card |
+| `--p2` | `#ff5959` | Player 2 fill |
+| `--p2-soft` | `#ffe8e8` | Active Player 2 card |
+| `--accent` | `#1176ff` | Focus rings, primary button |
+| `--cell-empty` | `#efeff3` | Empty cell fill |
+| `--font-display` | `CustomFont`, Segoe UI | Title, player names, dialog title |
+| `--font-body` | system UI stack | Everything else |
+| `--safe-*` | `env(safe-area-inset-*)` | Android edge-to-edge padding |
 
-`font.ttf` is loaded via `@font-face { font-family: customFont; }`. It is applied
-to `header` and `.player h3`; the rest of the document falls back to the browser
-default (`Times New Roman` in Chromium).
+`font.ttf` is bundled with `@font-face` and `font-display: swap`. There is no
+remote font request, so the app works offline.
 
 ---
 
 ## 4. Components
 
-### 4.1 Navbar (`header.navbar`)
+### 4.1 Navbar
 
-- Flex row, space-between, `padding: 20px 10px`.
-- `#333` background, white text, rounded bottom corners, drop shadow.
-- `h1` is 24 px, weight 400.
-- The only link is `*` pointing at `#`; it is a placeholder with no destination.
+- Dark `#333` bar with rounded bottom corners and a subtle shadow.
+- Left: title and tagline. Right: **New game**.
+- The tagline is hidden below 380 px width and in short landscape viewports.
 
-### 4.2 Player panels (`section.player-progress`, `.player`)
+### 4.2 Turn banner (`.turn`)
 
-- Flex row; two panels at `width: 49%`, separated by `space-between`.
-- Each panel is a column with a rounded inner `.p1p` / `.p2p` box, padding 10 px.
-- A `<progress>` bar tracks occupied cells (`max=49`), not orb count.
-- Active player feedback is applied inline by `script.js`:
-  - Player 1 active → `.player1c` background `var(--p1)` (blue).
-  - Player 2 active → `.player2c` background `var(--p2)` (red).
-  - The other panel is reset to no inline background (falls back to `--bg`).
+- Full-width card with a 6 px coloured left edge: blue for Player 1, red for
+  Player 2, dark grey when the game is over.
+- Text: `Player N to move`, or `Player N wins!` / `It's a draw.` after the game.
+- `role="status"` and `aria-live="polite"` announce every turn change and the
+  result to screen readers.
 
-### 4.3 Turn label (`#turn`)
+### 4.3 Player cards (`.score.score--bar`)
 
-- Centered, 24 px, bold.
-- **Hidden with `display: none`.** It is still updated by `switchTurn()` and
-  `checkGameOver()`, so it carries state that the user cannot see.
+- One card above the board (Player 2) and one below (Player 1).
+- Each card shows the player's name, **cells owned**, and **orbs owned**.
+- The left edge and name dot use the player colour; Player 2's dot is red.
+- The active player's card gets a soft tint, a 2 px coloured ring, and a
+  "playing" pill. The turn is therefore signalled by text, colour, position,
+  and the banner — not colour alone.
+- Stats are recomputed from `GameState` on every render:
+  `countCells` / `countOrbs`.
 
-### 4.4 Board (`#game-board`)
+### 4.4 Board (`.board`)
 
-- CSS grid: `grid-template-columns: repeat(7, 50px)`,
-  `grid-template-rows: repeat(7, 50px)`, `gap: 2px`.
-- Container `width: 80%`, `margin: 0 auto`.
-- Track footprint is therefore **362 px** (7 × 50 + 6 × 2), independent of the
-  container width. On a 698 px viewport the container measured **530 × 362 px**,
-  so the 362 px of cells sit at the **left edge of a wider centered box**; the
-  board is not visually centered in its own container.
-- Because tracks are fixed, the layout needs about **476 px** of viewport width
-  before cells overflow the container. There are no media queries.
+- Square CSS grid: `repeat(7, minmax(0, 1fr))`, gap `clamp(2px, 0.8vw, 6px)`.
+- Width: `min(92vw, 52vh, 560px)`, so it fits phones, tablets, and desktop
+  without horizontal scrolling.
+- White frame with rounded corners and a small shadow.
+- `touch-action: manipulation` removes the 300 ms tap delay on Android without
+  disabling pinch-zoom for accessibility.
 
-### 4.5 Cell (`.cell`)
+### 4.5 Cell (`button.cell`)
 
-- 50 × 50 px, `border-radius: 50%`, flex-centered.
-- Default background `--box` (same as the page), so empty cells are visible only
-  as flat circles against the page.
-- Owned cells get `.player1` (blue) or `.player2` (red) backgrounds.
-- No `cursor: pointer`; no hover, active, or focus styling.
+- Circular (`border-radius: 50%`), `aspect-ratio: 1`, at least ~44–57 px on
+  typical phones (the board scales with the viewport).
+- Empty: light grey fill with a visible border.
+- Player 1: blue `--p1` fill. Player 2: red `--p2` fill.
+- Legal cells get `cursor: pointer`, a hover ring, and scale slightly on press.
+- Focus: 3 px accent ring with an offset, visible on both empty and owned cells.
+- Illegal cells keep their focusability for inspection but are marked
+  `aria-disabled="true"` and do nothing when activated.
 
-### 4.6 Dot (`.dot`)
+### 4.6 Orbs (`.orb`)
 
-- 10 × 10 px black circle.
-- One per orb; up to the explosion threshold.
-- Laid out by the cell's flexbox with default `row` direction, so 2–3 dots
-  appear side by side, not arranged around the cell centre (the Pygame version
-  distributes them radially).
+- Up to four decorative dots inside an owned cell.
+- Player 1 orbs are **solid dark**; Player 2 orbs are **hollow white with a dark
+  ring**. This shape/fill difference makes ownership readable without colour.
+- Layout by orb count:
+  - 1 → centre
+  - 2 → horizontal pair
+  - 3 → triangle
+  - 4 → 2×2
+- `data-orbs` on the button drives positions via `--x` / `--y` custom
+  properties; CSS transitions animate changes.
+
+### 4.7 Hint
+
+- One line of rules text under the bottom player card.
+- Replaced with "Game over. Start a new game to play again." when the game ends.
+- Hidden in short landscape viewports to save vertical space.
+
+### 4.8 Overlay (`dialog.overlay`)
+
+Used for two things:
+
+1. **Result** — eyebrow "Game over", title `Player N wins` or `It's a draw`,
+   explanation, and the actions **Play again** (primary) / **View board**.
+2. **Restart confirmation** — title "Start over?", actions **Start over** /
+   **Keep playing**, shown only when a game is in progress.
+
+Behaviour:
+
+- Native `<dialog>` with `showModal()`: focus is trapped, `Escape` cancels, the
+  backdrop dims the board.
+- Clicking the backdrop closes the dialog.
+- Closing restores focus to the board.
+- A finished game restored from storage shows the result dialog on launch.
 
 ---
 
 ## 5. Visual states
 
-| State | How it is represented | Current problem |
-| --- | --- | --- |
-| Empty cell | Flat grey circle | Low contrast against the page background |
-| Player 1 cell | Blue circle, black dots | — |
-| Player 2 cell | Red circle, black dots | — |
-| Active player | Panel tint (blue/red) | Turn text hidden; colour-only cue |
-| Explosion | Source cell cleared, neighbours recoloured | Ghost orb remains at the source; no animation |
-| Win | `#turn` text + panel `--theme` | Text hidden; `handleCellClick` immediately overwrites the panel highlight |
-| Game over | Nothing locks | Board keeps changing on clicks |
+| State | Representation |
+| --- | --- |
+| Empty cell | Grey circle with a border |
+| Player 1 cell | Blue fill, solid dark orbs |
+| Player 2 cell | Red fill, hollow white orbs |
+| Legal target | Pointer cursor, hover ring, press scale |
+| Illegal target | No pointer, `aria-disabled="true"` |
+| Active player | Card tint + ring + "playing" pill, coloured banner |
+| Explosion | Source cell cleared; surrounding cells flash via Web Animations |
+| Transfer / capture | Destination cell brightness flash, orb pop |
+| Win | Banner text + modal dialog; board locked |
+| Saved game | Restored on launch, result dialog if it was finished |
 
-Because the win state is invisible and the game does not lock, a finished game
-looks exactly like a game in progress.
+Because the board is re-rendered from `GameState` after every move, the DOM can
+never show an orb the model does not contain (the legacy "ghost coin" bug).
 
 ---
 
 ## 6. Interaction
 
-- **Input:** mouse click on a cell. The listener is attached per cell and uses
-  `event.target.closest(".cell")`, so clicks on a dot still resolve to the cell.
-- **Legal actions:** place on an empty cell during your opening move; otherwise
-  add an orb to one of your own cells. (See `ALGORITHM.md` — the web version
-  forbids placement after the opening move, which is a rule defect, not a UI
-  choice.)
-- **Illegal actions:** clicking an enemy cell, an empty cell after the opening
-  move, or anything after a win. Illegal clicks are silently ignored; the turn
-  does not change.
-- **Feedback:** orb count (dots), occupied-cell progress bar, active panel tint.
-- **No other input:** no keyboard, touch gestures, drag, or context menu.
+- **Pointer / touch:** tap or click a legal cell. Legal targets are any empty
+  cell or a cell owned by the current player.
+- **Keyboard:** cells form a single tab stop (roving `tabindex`). Once focused:
+  - `ArrowUp` / `ArrowDown` / `ArrowLeft` / `ArrowRight` move focus.
+  - `Home` / `End` jump to the start / end of the row.
+  - `Enter` / `Space` place an orb (native button activation).
+- **Illegal actions** (enemy cell, out of bounds, after game over) are ignored;
+  the turn does not change and nothing is saved.
+- **New game** asks for confirmation if a game is in progress; otherwise it
+  starts immediately.
+- **Haptics:** a short vibration on accepted moves and a slightly longer one on
+  rejected moves where the platform supports `navigator.vibrate`; silently
+  skipped in browsers that do not.
+- **Animations:** place, add, explode, and transfer events are replayed as short
+  Web Animations effects. They are skipped entirely when
+  `prefers-reduced-motion: reduce` is set.
 
 ---
 
-## 7. Responsiveness
+## 7. Responsiveness and safe areas
 
-- Fixed 50 px cells and a fixed 7×7 grid.
-- `.player-progress` is `width: 95% !important`; the board is a centered `80%`
-  box, but its tracks are not centered inside it (see §4.4).
-- Below roughly 476 px viewport width the grid overflows horizontally; there is
-  no horizontal scroll container and no scaling.
-- Very large viewports leave a growing empty gap to the right of the cells.
-- No dark mode; the palette is light-only.
+- Board width is bounded by viewport width, viewport height, and a 560 px cap.
+- Player cards stretch to the full row; stats wrap on very narrow screens.
+- The tagline and hint collapse on small/short viewports.
+- Short landscape (`max-height: 560px`) reduces gaps and paddings; the page may
+  scroll vertically rather than shrinking the board below usability.
+- `viewport-fit=cover` plus `env(safe-area-inset-*)` padding keeps the UI clear
+  of notches, gesture bars, and Android 15/16 system bars.
+- No dark mode: `color-scheme: light` and `android:forceDarkAllowed=false` in the
+  Android shell prevent WebView auto-dark from inverting the board.
+- Text uses `clamp()` and the system font stack, so Android font-size and
+  display-size settings scale it.
 
 ---
 
 ## 8. Accessibility
 
-Current gaps:
+- Every cell is a `<button>` with a descriptive `aria-label` including row,
+  column, owner, and orb count.
+- The turn and result text live in an `aria-live="polite"` status region.
+- Illegal cells expose `aria-disabled="true"`; the game-over state disables all
+  cells.
+- Ownership is not colour-only: Player 2 orbs are hollow, and the active card
+  has a text "playing" pill.
+- Visible `:focus-visible` rings on cells and buttons.
+- Full keyboard play with a single board tab stop.
+- Reduced-motion support.
+- The dialog is a native modal with focus trapping and Escape handling.
+- The board `role="group"` is labelled with its size.
 
-1. **Not keyboard operable.** Cells are `div` elements without `tabindex`,
-   `role="button"`, or key handlers. The game cannot be played without a mouse.
-2. **No accessible names.** A cell exposes no label such as "row 3, column 4,
-   Player 1, 2 orbs". Screen readers see empty divs.
-3. **Colour-only ownership.** The blue/red fill is the only ownership cue; dots
-   encode count. Colour-blind players cannot reliably distinguish players.
-   Add a shape/pattern/secondary marker.
-4. **Hidden status text.** `#turn` is `display: none`, not visually hidden in an
-   accessible way; there is no `aria-live` region announcing turns or wins.
-5. **Unlabelled progress bars.** `<progress>` has no `<label>` or
-   `aria-label`; additionally its value is "occupied cells", which is not
-   explained anywhere in the UI.
-6. **Contrast.** Empty cells (`--bg` on `--bg`) have effectively no boundary;
-   black dots on the dark blue `#6e6eff` are low contrast for small shapes.
-7. **No focus indicator** and no visible pressed state.
-8. **Motion.** No animations today, so no reduced-motion issue yet; keep this in
-   mind when adding cascade animations.
+Not yet covered: a dedicated high-contrast theme and TalkBack-specific testing
+on a physical device (Phase 3).
 
 ---
 
-## 9. Recommended UI changes
+## 9. Android shell notes (Phase 3)
 
-Prioritised:
-
-1. **Show the turn.** Remove `display: none` from `#turn`, or replace it with a
-   dedicated status bar. Do not hide the only textual game state.
-2. **Win overlay.** A modal/panel with "Player X wins", a restart button, and
-   input locking. Do not rely on a panel tint.
-3. **Fix the ghost orb** in the renderer (see `ALGORITHM.md`, defect B).
-4. **Center the board.** Either set the grid width to `max-content` and center
-   it, or use `justify-content: center` on `#game-board`, and switch tracks to
-   `1fr` with an aspect-ratio container.
-5. **Make cells real buttons.** `<button class="cell">` with `aria-label`,
-   `:focus-visible`, and keyboard activation gives focus, Enter/Space, and
-   screen-reader support almost for free.
-6. **Add a non-colour ownership cue** (ring, icon, or dot pattern).
-7. **Show orb count and capacity**, e.g. "2 / 4", or at minimum a tooltip.
-8. **Restart control** in the navbar, plus a score line ("wins: 3 – 1").
-9. **Responsive scaling** with `clamp()` or a square container so the board fits
-   phones and stays centered on desktop.
-10. **Animate explosions** from engine events (see `ARCHITECTURE.md` §4.3).
+- `viewport-fit=cover` and safe-area padding are already in place.
+- The back button will close an open dialog, then ask before leaving a live
+  game, then exit. That adapter lives in `src/platform/backButton.ts`.
+- Preferences will replace `localStorage` behind the same `StorageAdapter`
+  interface, so the UI code does not change.
+- Haptics will use `@capacitor/haptics` behind the existing `Haptics`
+  interface.
+- The splash screen and status-bar colours are configured in the Capacitor
+  shell, not in the UI.
 
 ---
 
-## 10. Pygame UI
+## 10. Legacy UI (archived)
 
-`legacy/main.py` renders a fixed **700 × 750** window:
+The previous `index.html` / `style.css` / `script.js` UI is preserved in git
+history. It had a hidden `#turn` label, side-by-side player panels, fixed 50 px
+cells, `div` cells with no keyboard support, and no win dialog. It was replaced
+in Phase 2 and should not be reintroduced. See the "Legacy defects" section of
+the [`README`](../README.md).
 
-- 50 px top band for the title ("Chain Reaction Game", centered).
-- 7×7 grid of 100 px cells starting at `y = 50`, grey fill with a 1 px black
-  border.
-- Coins: filled circle of radius 25 px, red for Player 1 and green for Player 2,
-  with up to 3 black dots arranged radially using `cos/sin`.
-- Turn text ("Player X's Turn") centered at `y = 70`, using a 55 px font. The
-  board starts at `y = 50` and is drawn **after** the text, so the top row of
-  cells paints over it: the turn label is effectively invisible.
-- The title uses a 70 px font at `y = 10` in a 50 px band, so its lower part is
-  also covered by the first board row.
-- Winner text ("Player X Wins!") centered in the window.
-- No menus, buttons, hover states, or restart; close the window to quit.
-- The window is not resizable and the UI does not scale.
-- Because there is no `Clock`, the window repaints at unbounded FPS.
-
-The Pygame UI has the same conceptual defects: no visible capacity for
-corners/edges, immediate (unanimated) cascades, and a win state that can be
-reached by a cascade without being shown until the next click.
+The Pygame window in `legacy/main.py` remains a 700 × 750 prototype: 100 px
+cells, red/green coins, and turn/winner text that the board paints over. It is
+not part of the product.

@@ -1,0 +1,183 @@
+import { capacityAt, type GameState } from "../engine/index.js";
+
+export const SAVE_KEY = "color-wars:save";
+export const SAVE_VERSION = 1;
+
+const BOARD_ROWS = 7;
+const BOARD_COLS = 7;
+
+export interface KeyValueStore {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+}
+
+export interface StorageAdapter {
+  load(): GameState | null;
+  save(state: GameState): void;
+  clear(): void;
+}
+
+interface SavePayload {
+  version: number;
+  savedAt: number;
+  state: GameState;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Accepts only a complete, stable 7x7 board. A corrupt or half-written save
+ * must never reach the renderer; the caller starts a new game instead.
+ */
+export function isGameState(value: unknown): value is GameState {
+  if (!isRecord(value)) return false;
+
+  const rows = value["rows"];
+  const cols = value["cols"];
+  if (rows !== BOARD_ROWS || cols !== BOARD_COLS) return false;
+
+  const board = value["board"];
+  if (!Array.isArray(board) || board.length !== BOARD_ROWS) return false;
+
+  for (let row = 0; row < BOARD_ROWS; row += 1) {
+    const boardRow: unknown = board[row];
+    if (!Array.isArray(boardRow) || boardRow.length !== BOARD_COLS) return false;
+
+    for (let col = 0; col < BOARD_COLS; col += 1) {
+      const cell: unknown = boardRow[col];
+      if (cell === null) continue;
+      if (!isRecord(cell)) return false;
+
+      const owner = cell["owner"];
+      const orbs = cell["orbs"];
+      if (owner !== 1 && owner !== 2) return false;
+      if (typeof orbs !== "number" || !Number.isInteger(orbs)) return false;
+      if (orbs < 1 || orbs >= capacityAt(BOARD_ROWS, BOARD_COLS, row, col)) {
+        return false;
+      }
+    }
+  }
+
+  const currentPlayer = value["currentPlayer"];
+  if (currentPlayer !== 1 && currentPlayer !== 2) return false;
+
+  const hasPlayed = value["hasPlayed"];
+  if (!isRecord(hasPlayed)) return false;
+  if (typeof hasPlayed["1"] !== "boolean") return false;
+  if (typeof hasPlayed["2"] !== "boolean") return false;
+
+  if (typeof value["gameOver"] !== "boolean") return false;
+
+  const winner = value["winner"];
+  if (winner !== null && winner !== 1 && winner !== 2) return false;
+
+  const moveCount = value["moveCount"];
+  if (
+    typeof moveCount !== "number" ||
+    !Number.isInteger(moveCount) ||
+    moveCount < 0
+  ) {
+    return false;
+  }
+
+  // A cascade-limit draw is a defensive state, not a resumable game.
+  if (value["cascadeLimitReached"] !== false) return false;
+
+  return true;
+}
+
+export function parseSave(raw: string): GameState | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+
+  if (!isRecord(parsed)) return null;
+  if (parsed["version"] !== SAVE_VERSION) return null;
+
+  const state = parsed["state"];
+  if (!isGameState(state)) return null;
+
+  return state;
+}
+
+export function createStorage(
+  store: KeyValueStore,
+  key: string = SAVE_KEY,
+): StorageAdapter {
+  function remove(): void {
+    try {
+      store.removeItem(key);
+    } catch {
+      // Storage can be unavailable in private mode; losing a save is fine.
+    }
+  }
+
+  return {
+    load() {
+      let raw: string | null;
+      try {
+        raw = store.getItem(key);
+      } catch {
+        return null;
+      }
+
+      if (raw === null) return null;
+
+      const state = parseSave(raw);
+      if (state === null) remove();
+      return state;
+    },
+
+    save(state) {
+      if (!isGameState(state)) return;
+
+      const payload: SavePayload = {
+        version: SAVE_VERSION,
+        savedAt: Date.now(),
+        state,
+      };
+
+      try {
+        store.setItem(key, JSON.stringify(payload));
+      } catch {
+        // Quota or private mode: the game keeps running without persistence.
+      }
+    },
+
+    clear: remove,
+  };
+}
+
+export function memoryStore(): KeyValueStore {
+  const values = new Map<string, string>();
+
+  return {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => {
+      values.set(key, value);
+    },
+    removeItem: (key) => {
+      values.delete(key);
+    },
+  };
+}
+
+export function browserStore(): KeyValueStore {
+  if (typeof window === "undefined") return memoryStore();
+
+  try {
+    const store = window.localStorage;
+    const probe = "__color-wars-probe__";
+    store.setItem(probe, "1");
+    store.removeItem(probe);
+    return store;
+  } catch {
+    return memoryStore();
+  }
+}

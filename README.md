@@ -9,27 +9,20 @@ The **web implementation is the product**. It will ship as an Android app built
 with Capacitor (see [`docs/ANDROID.md`](docs/ANDROID.md)). The Pygame prototype
 in `legacy/main.py` is archived for reference and is no longer maintained.
 
-> **Status: engine complete, UI rewrite in progress.** The pure TypeScript
-> engine (`src/engine/`) is implemented and covered by 29 Vitest tests. The
-> legacy root UI is still the playable build until Phase 2 replaces it; the
-> defects below are fixed by the new engine but not yet visible in the browser.
-> See the [roadmap](#roadmap).
+> **Status: playable web build.** The pure engine, the new UI, and save/resume
+> are complete and covered by 49 Vitest tests. Phase 3 wraps the Vite build in a
+> Capacitor Android shell; Phase 4 handles signing and release. See the
+> [roadmap](#roadmap).
 
 ---
 
 ## Quick start
 
-### Web version
-
-No build step and no dependencies.
-
 ```powershell
-# Option A: open the file directly
-start index.html
-
-# Option B: serve it (recommended if the browser blocks the font)
-python -m http.server 8088
-# then open http://localhost:8088/
+npm install
+npm run dev        # http://localhost:5173
+npm test           # engine, storage, and UI tests
+npm run build      # production build in dist/
 ```
 
 ### Legacy desktop version (archived)
@@ -46,9 +39,8 @@ work happens on the web/Android build.
 
 ## How to play
 
-The target rules (what the new engine implements):
-
-- **Both players share one device** (hot-seat).
+- **Both players share one device** (hot-seat). **Player 2's panel sits above
+  the board and Player 1's panel sits below it.**
 - On a turn, either place a new orb on **any empty cell** or add one orb to a
   cell you already own.
 - A cell explodes when it reaches its capacity: **2 in a corner, 3 on an edge,
@@ -57,10 +49,9 @@ The target rules (what the new engine implements):
   neighbour, converting enemy orbs to the exploding player.
 - Cascades resolve automatically. A player with no orbs left loses.
 
-The legacy web build behaves differently (see [Known issues](#known-issues)):
-it forbids new placements after the opening move and uses a fixed capacity of 4
-everywhere. The active player is indicated only by the tinted panel because the
-`#turn` label is hidden. See [`docs/UI.md`](docs/UI.md).
+The active player's panel is highlighted and the turn banner names them. When
+the game ends, a result dialog appears and the board is locked until you start a
+new game. See [`docs/UI.md`](docs/UI.md).
 
 ---
 
@@ -68,18 +59,22 @@ everywhere. The active player is indicated only by the tinted panel because the
 
 ```
 Color Wars/
-├── index.html          # App shell (replaced in Phase 2)
-├── style.css           # Legacy theme and layout
-├── script.js           # Legacy web engine (known defects)
+├── index.html          # Vite entry, mounts #app
 ├── font.ttf            # Custom display font
+├── src/
+│   ├── main.ts         # Bootstrap and lifecycle persistence
+│   ├── engine/         # Pure rules: types, board, cascade, moves, winner
+│   ├── ui/             # shell, board, HUD, overlay, animations, controller
+│   ├── platform/       # storage adapter and haptics
+│   └── styles/         # tokens.css and app.css
+├── tests/
+│   ├── engine/         # board, moves, cascades, winner, stress
+│   ├── platform/       # save schema and storage adapter
+│   └── ui/             # jsdom app tests
+├── android/            # Phase 3 target: Capacitor Android project
 ├── legacy/
 │   └── main.py         # Archived Pygame prototype
-├── src/
-│   └── engine/         # Pure rules: types, board, cascade, moves, winner
-├── tests/
-│   └── engine/         # Vitest suite (29 tests)
-├── android/            # Phase 3 target: Capacitor Android project
-├── package.json        # Vite + TypeScript + Vitest
+├── package.json
 ├── tsconfig.json
 ├── vite.config.ts
 ├── docs/
@@ -91,9 +86,8 @@ Color Wars/
 └── README.md
 ```
 
-The repository is under git (baseline commit `chore: baseline before engine
-rewrite`). `src/engine/` and `tests/` are complete; `src/ui/`, `src/platform/`,
-and `android/` are the Phase 2–3 targets and do not exist yet.
+`src/engine/` and `src/ui/` are complete for the web build. `android/` is the
+Phase 3 target and does not exist yet.
 
 ---
 
@@ -101,9 +95,9 @@ and `android/` are the Phase 2–3 targets and do not exist yet.
 
 ```powershell
 npm ci
-npm test          # 29 engine tests
+npm test               # 49 engine, storage, and UI tests
 npm run typecheck
-npm run build     # Vite production build (legacy entry until Phase 2)
+npm run build          # Vite production build in dist/
 npx cap sync android   # Phase 3
 ```
 
@@ -112,48 +106,43 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §4.3 for the target layout a
 
 ---
 
-## Known issues
+## Legacy defects (fixed)
 
-These are confirmed by running the code, not just by reading it.
+The pre-rebuild prototypes are preserved in git history and `legacy/main.py`.
+Their defects are recorded here so they are not reintroduced; each has
+regression coverage in the test suite.
 
-### Web (`script.js`)
+### Legacy web (`script.js`, removed)
 
-1. **No placement after the first move.** After both players' opening moves, only
-   clicks on your own coins are accepted. Placing a new coin on an empty cell is
-   impossible, although that is a core Chain Reaction rule.
-2. **Ghost coin after an explosion.** The exploding cell is cleared by
-   `spreadPoints`, then immediately redrawn by `updateCell` in `incrementPoints`.
-   The screen shows an orb that the board model does not contain, so the score
-   and the board permanently disagree.
-3. **Wrong capacities.** Every cell explodes at 4 orbs. Corners should explode
-   at 2 and edges at 3.
-4. **Invisible turn and win text.** `#turn` is `display: none`. The win message is
-   written into that element, and the active-player highlight overwrites the
-   winner highlight immediately after `checkGameOver()` runs.
-5. **No game-over lock.** Clicking after a win keeps mutating the board.
+1. **No placement after the first move** — fixed by `isLegalMove`, which allows
+   any empty cell or the current player's cells (`moves.test.ts`).
+2. **Ghost coin after an explosion** — the UI now renders only from
+   `GameState`, so a cleared cell cannot keep a stale orb (`app.test.ts`,
+   browser check).
+3. **Fixed capacity of 4** — replaced by `capacityAt` (2/3/4) and covered by
+   `board.test.ts`.
+4. **Invisible turn and win text** — the turn banner is a visible
+   `aria-live` region and the win state is a modal dialog.
+5. **No game-over lock** — `applyMove` rejects moves after a win, and the board
+   exposes `aria-disabled` cells (`winner.test.ts`).
 
-### Desktop (`legacy/main.py`)
+### Legacy desktop (`legacy/main.py`)
 
-1. **Duplicate coins per cell.** `handle_explosions` looks up neighbours in the
-   old `coins` list, so two adjacent explosions can create two coins in the same
-   empty cell.
-2. **Wrong capacities.** Same fixed capacity of 4 for corners and edges.
-3. **Unbounded frame rate.** No `pygame.time.Clock`, so the loop spins at
-   unlimited FPS and uses a full CPU core.
-4. **Win check only on click.** Cascades can eliminate a player without ending
-   the game until the next click.
-5. **No cascade animation.** Explosions resolve instantly.
+1. Duplicate coins per cell — the board stores exactly one cell object.
+2. Fixed capacity of 4 — same `capacityAt` fix.
+3. Unbounded frame rate — not applicable; the web build renders on events.
+4. Win check only on click — wins are evaluated after every cascade.
+5. No cascade animation — engine events drive the UI animation.
 
 ---
 
 ## Documentation
 
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — legacy code, target
-  structure, engine/UI/platform contracts.
-- [`docs/ALGORITHM.md`](docs/ALGORITHM.md) — rules, state, and the intended
-  cascade algorithm, compared with what the code actually does.
-- [`docs/UI.md`](docs/UI.md) — visual layout, components, states, and
-  accessibility.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — current code structure,
+  engine/UI/platform contracts, and phase status.
+- [`docs/ALGORITHM.md`](docs/ALGORITHM.md) — rules, state, and the cascade
+  algorithm.
+- [`docs/UI.md`](docs/UI.md) — layout, components, states, and accessibility.
 - [`docs/ANDROID.md`](docs/ANDROID.md) — APK/AAB pipeline, signing, supported
   Android range, feature parity, and device test matrix.
 - [`docs/FEATURES.md`](docs/FEATURES.md) — feature backlog (blank for now).
@@ -166,8 +155,8 @@ These are confirmed by running the code, not just by reading it.
 | --- | --- | --- |
 | 0 | git baseline, archive `legacy/main.py`, keep the legacy web build runnable | done |
 | 1 | pure TypeScript engine (`src/engine/`) + Vitest suite, no visual change | done |
-| 2 | rebuild the UI on the engine: visible turn banner, win overlay, restart, save/resume, accessibility | planned |
-| 3 | Capacitor 8 shell, Android project, device matrix | planned |
+| 2 | rebuild the UI on the engine: visible turn banner, win overlay, restart, save/resume, accessibility | done |
+| 3 | Capacitor 8 shell, Android project, device matrix | next |
 | 4 | signing, release build, Play checklist, hardening | planned |
 
 Definition of "stable" for the Android release: see
