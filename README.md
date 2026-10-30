@@ -5,19 +5,15 @@ add an orb; a cell that reaches its capacity explodes and sends one orb to each
 orthogonal neighbour, converting enemy orbs along the way. The last player with
 orbs on the board wins.
 
-The project contains **two independent implementations** of the same idea:
+The **web implementation is the product**. It will ship as an Android app built
+with Capacitor (see [`docs/ANDROID.md`](docs/ANDROID.md)). The Pygame prototype
+in `legacy/main.py` is archived for reference and is no longer maintained.
 
-| Version | Entry point | Stack |
-| --- | --- | --- |
-| Web | `index.html` | HTML + CSS + vanilla JavaScript |
-| Desktop | `main.py` | Python 3 + Pygame |
-
-Both were written in 2024 as prototypes. They share no code and have drifted
-apart in their rules.
-
-> **Status: prototype.** The apps launch and accept clicks, but the rule engine
-> is not correct yet. See [Known issues](#known-issues) and
-> [`docs/ALGORITHM.md`](docs/ALGORITHM.md) for details.
+> **Status: engine complete, UI rewrite in progress.** The pure TypeScript
+> engine (`src/engine/`) is implemented and covered by 29 Vitest tests. The
+> legacy root UI is still the playable build until Phase 2 replaces it; the
+> defects below are fixed by the new engine but not yet visible in the browser.
+> See the [roadmap](#roadmap).
 
 ---
 
@@ -36,28 +32,35 @@ python -m http.server 8088
 # then open http://localhost:8088/
 ```
 
-### Desktop version
+### Legacy desktop version (archived)
 
 ```powershell
 pip install pygame
-python main.py
+python legacy/main.py
 ```
 
-Tested with Python 3.12 and Pygame 2.6.1.
+Tested with Python 3.12 and Pygame 2.6.1. It is kept only as a reference; new
+work happens on the web/Android build.
 
 ---
 
 ## How to play
 
-- **Both players share one mouse** (hot-seat).
-- **First click per player:** place a coin on any empty cell.
-- **Later clicks:** add a coin to a cell you already own.
-- A cell shows 1–3 dots. When it gains a 4th, it explodes.
-- The player whose coins are all converted loses.
+The target rules (what the new engine implements):
 
-The active player is indicated by the tinted panel at the top of the page. The
-`#turn` text that should show "Player X's Turn" is currently hidden by CSS, so
-the panel tint is the only turn feedback. See [`docs/UI.md`](docs/UI.md).
+- **Both players share one device** (hot-seat).
+- On a turn, either place a new orb on **any empty cell** or add one orb to a
+  cell you already own.
+- A cell explodes when it reaches its capacity: **2 in a corner, 3 on an edge,
+  4 in the interior**.
+- A cell that explodes clears itself and sends one orb to each orthogonal
+  neighbour, converting enemy orbs to the exploding player.
+- Cascades resolve automatically. A player with no orbs left loses.
+
+The legacy web build behaves differently (see [Known issues](#known-issues)):
+it forbids new placements after the opening move and uses a fixed capacity of 4
+everywhere. The active player is indicated only by the tinted panel because the
+`#turn` label is hidden. See [`docs/UI.md`](docs/UI.md).
 
 ---
 
@@ -65,20 +68,47 @@ the panel tint is the only turn feedback. See [`docs/UI.md`](docs/UI.md).
 
 ```
 Color Wars/
-├── index.html          # Web markup: navbar, player panels, board container
-├── style.css           # Theme tokens, layout, board/cell/dot styling
-├── script.js           # Web game engine (board state, turns, explosions)
-├── main.py             # Pygame implementation of the same game
-├── font.ttf            # Custom display font (navbar and player headings)
+├── index.html          # App shell (replaced in Phase 2)
+├── style.css           # Legacy theme and layout
+├── script.js           # Legacy web engine (known defects)
+├── font.ttf            # Custom display font
+├── legacy/
+│   └── main.py         # Archived Pygame prototype
+├── src/
+│   └── engine/         # Pure rules: types, board, cascade, moves, winner
+├── tests/
+│   └── engine/         # Vitest suite (29 tests)
+├── android/            # Phase 3 target: Capacitor Android project
+├── package.json        # Vite + TypeScript + Vitest
+├── tsconfig.json
+├── vite.config.ts
 ├── docs/
-│   ├── ARCHITECTURE.md # Code structure, data flow, and design notes
+│   ├── ARCHITECTURE.md # Code structure, data flow, target architecture
 │   ├── ALGORITHM.md    # Game rules, state, and cascade algorithm
 │   ├── UI.md           # Layout, components, states, accessibility
+│   ├── ANDROID.md      # APK/AAB build, signing, compatibility, testing
 │   └── FEATURES.md     # Planned features (currently blank)
 └── README.md
 ```
 
-There is no git repository, package manifest, test suite, or build pipeline.
+The repository is under git (baseline commit `chore: baseline before engine
+rewrite`). `src/engine/` and `tests/` are complete; `src/ui/`, `src/platform/`,
+and `android/` are the Phase 2–3 targets and do not exist yet.
+
+---
+
+## Development
+
+```powershell
+npm ci
+npm test          # 29 engine tests
+npm run typecheck
+npm run build     # Vite production build (legacy entry until Phase 2)
+npx cap sync android   # Phase 3
+```
+
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §4.3 for the target layout and
+[`docs/ANDROID.md`](docs/ANDROID.md) for the APK pipeline.
 
 ---
 
@@ -102,7 +132,7 @@ These are confirmed by running the code, not just by reading it.
    winner highlight immediately after `checkGameOver()` runs.
 5. **No game-over lock.** Clicking after a win keeps mutating the board.
 
-### Desktop (`main.py`)
+### Desktop (`legacy/main.py`)
 
 1. **Duplicate coins per cell.** `handle_explosions` looks up neighbours in the
    old `coins` list, so two adjacent explosions can create two coins in the same
@@ -118,21 +148,27 @@ These are confirmed by running the code, not just by reading it.
 
 ## Documentation
 
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — how the code is organised.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — legacy code, target
+  structure, engine/UI/platform contracts.
 - [`docs/ALGORITHM.md`](docs/ALGORITHM.md) — rules, state, and the intended
   cascade algorithm, compared with what the code actually does.
 - [`docs/UI.md`](docs/UI.md) — visual layout, components, states, and
   accessibility.
+- [`docs/ANDROID.md`](docs/ANDROID.md) — APK/AAB pipeline, signing, supported
+  Android range, feature parity, and device test matrix.
 - [`docs/FEATURES.md`](docs/FEATURES.md) — feature backlog (blank for now).
 
 ---
 
 ## Roadmap
 
-1. Replace the scattered rule logic with one small engine module: board model,
-   per-cell capacity, queue-based cascade, explicit win detection.
-2. Fix the UI: visible turn banner, win overlay, restart button, keyboard access.
-3. Keep one platform as the primary target (the web version is the easiest to
-   share) and archive or regenerate the other from the same rules.
-4. Add tests for the engine (corner/edge capacities, chain reactions, winner
-   detection) before adding new features.
+| Phase | Scope | Status |
+| --- | --- | --- |
+| 0 | git baseline, archive `legacy/main.py`, keep the legacy web build runnable | done |
+| 1 | pure TypeScript engine (`src/engine/`) + Vitest suite, no visual change | done |
+| 2 | rebuild the UI on the engine: visible turn banner, win overlay, restart, save/resume, accessibility | planned |
+| 3 | Capacitor 8 shell, Android project, device matrix | planned |
+| 4 | signing, release build, Play checklist, hardening | planned |
+
+Definition of "stable" for the Android release: see
+[`docs/ANDROID.md`](docs/ANDROID.md) §13.

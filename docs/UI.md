@@ -243,7 +243,7 @@ Prioritised:
 
 ## 10. Pygame UI
 
-`main.py` renders a fixed **700 × 750** window:
+`legacy/main.py` renders a fixed **700 × 750** window:
 
 - 50 px top band for the title ("Chain Reaction Game", centered).
 - 7×7 grid of 100 px cells starting at `y = 50`, grey fill with a 1 px black

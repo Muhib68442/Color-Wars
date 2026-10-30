@@ -173,7 +173,7 @@ from being declared before both players have a coin on the board.
 
 Let `N = ROWS × COLS` and `E` be the number of explosion events in a cascade.
 
-| Operation | 2D array board | Sparse coin list (`main.py`) |
+| Operation | 2D array board | Sparse coin list (`legacy/main.py`) |
 | --- | --- | --- |
 | Read a cell | O(1) | O(n) linear scan |
 | One detonation | O(4) | O(4n) |
@@ -238,7 +238,7 @@ described in §1–§5**; it implements a related but different game.
 
 ---
 
-## 8. Current desktop implementation (`main.py`)
+## 8. Current desktop implementation (`legacy/main.py`)
 
 ### 8.1 What it does
 
