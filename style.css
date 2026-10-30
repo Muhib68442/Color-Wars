@@ -1,0 +1,141 @@
+
+@font-face {
+    font-family: customFont;
+    src: url(font.ttf);
+}
+
+:root {
+    --bg: #e2e2e2;
+    --bg-x: #333;
+    --theme: #1176ff;
+    --text: #000;
+    --text-i: #fff;
+    
+    --dot: #000;
+    --p1: var(--blue);
+    --p2: var(--red);
+    --box: var(--bg);
+
+    --red: #ff5959;
+    --green: #4eec4ee7;
+    --blue: #6e6eff;
+    --yellow: #ffff74;
+    --white: #fff;
+    --ff: 'customFont', sans-serif;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 10px;
+    background-color: var(--bg-x);
+    color: var(--text-i);
+    font-family: var(--ff);
+    border-bottom-left-radius: 10px;
+    border-bottom-right-radius: 10px;
+    margin-bottom: 10px;
+    box-shadow: 0px 0px 5px 0px #000;
+}
+header h1{
+    font-size: 24px;
+    font-weight: 400;
+}
+
+#turn {
+    margin-bottom: 10px;
+    font-size: 24px;
+    font-weight: bold;
+    text-align: center;
+    display: none;
+}
+
+#game-board {
+    display: grid;
+    grid-template-columns: repeat(7, 50px);
+    grid-template-rows: repeat(7, 50px);
+    gap: 2px;
+    width: 80%;
+    margin: 0 auto;
+}
+
+.cell {
+    width: 50px;
+    height: 50px;
+    background-color: var(--box);
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 24px;
+}
+
+.player1 {
+    background-color: var(--p1);
+}
+.player2 {
+    background-color: var(--p2);
+}
+
+.dot {
+    width: 10px;
+    height: 10px;
+    background-color: var(--dot);
+    border-radius: 50%;
+}
+
+main {
+    width: 95%;
+    margin: 0 auto;
+}
+
+.player-progress {
+    display: flex;
+    justify-content: space-between;
+    width: 95% !important;
+    margin: 10px auto;
+    border-radius: 10px !important;
+}
+
+.player {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    gap: 10px;
+    border-radius: 10px;
+    width: 49%;
+}
+
+.player h3 {
+    font-size: 20px;
+    font-family: var(--ff);
+    color: var(--text);
+    text-align: center;
+}
+
+.player p {
+    font-size: 20px;
+    font-family: var(--ff);
+}
+
+
+.player progress {
+    /* width: 100%; */
+}
+
+.p1p, .p2p {
+    padding: 10px;
+    border-radius: 10px;
+    margin: 0 5px;    
+}
+
+.player1c,.player2c{
+    background-color: var(--bg);
+}
