@@ -1,4 +1,10 @@
-export type Player = 1 | 2;
+export const MIN_GRID_SIZE = 7;
+export const MAX_GRID_SIZE = 15;
+export const MIN_PLAYERS = 1;
+export const MAX_PLAYERS = 4;
+
+export type Player = 1 | 2 | 3 | 4;
+export type PlayerCount = 1 | 2 | 3 | 4;
 
 export interface Cell {
   owner: Player;
@@ -15,6 +21,7 @@ export interface CellRef {
 export interface GameState {
   rows: number;
   cols: number;
+  playerCount: PlayerCount;
   board: Board;
   currentPlayer: Player;
   hasPlayed: Record<Player, boolean>;

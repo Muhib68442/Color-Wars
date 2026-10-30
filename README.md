@@ -1,18 +1,18 @@
 # Color Wars
 
-A local two-player **Chain Reaction**–style game on a 7×7 grid. Click a cell to
-add an orb; a cell that reaches its capacity explodes and sends one orb to each
-orthogonal neighbour, converting enemy orbs along the way. The last player with
-orbs on the board wins.
+A local **Chain Reaction**–style game for **one to four players** on a square
+grid from **7×7 to 15×15**. Click a cell to add an orb; a cell that reaches its
+capacity explodes and sends one orb to each orthogonal neighbour, converting
+enemy orbs along the way. The last player with orbs on the board wins.
 
 The **web implementation is the product**. It will ship as an Android app built
 with Capacitor (see [`docs/ANDROID.md`](docs/ANDROID.md)). The Pygame prototype
 in `legacy/main.py` is archived for reference and is no longer maintained.
 
-> **Status: playable web build.** The pure engine, the home/menu UI, and
-> save/resume are complete and covered by 58 Vitest tests. Phase 3 wraps the
-> Vite build in a Capacitor Android shell; Phase 4 handles signing and release.
-> See the [roadmap](#roadmap).
+> **Status: playable web build.** The pure engine, home/menu flow, settings,
+> multi-player boards, and save/resume are complete and covered by 87 Vitest
+> tests. Phase 3 wraps the Vite build in a Capacitor Android shell; Phase 4
+> handles signing and release. See the [roadmap](#roadmap).
 
 ---
 
@@ -21,7 +21,7 @@ in `legacy/main.py` is archived for reference and is no longer maintained.
 ```powershell
 npm install
 npm run dev        # http://localhost:5173
-npm test           # engine, storage, and UI tests
+npm test           # engine, settings, storage, and UI tests
 npm run build      # production build in dist/
 ```
 
@@ -39,22 +39,31 @@ work happens on the web/Android build.
 
 ## How to play
 
-- **Both players share one device** (hot-seat). **Player 2's panel sits above
-  the board and Player 1's panel sits below it.**
+- **Everyone shares one device** (hot-seat). Player 1 sits at the bottom,
+  Player 2 at the top, and Players 3 and 4 on the left and right for
+  four-player matches.
 - On a turn, either place a new orb on **any empty cell** or add one orb to a
   cell you already own.
 - A cell explodes when it reaches its capacity: **2 in a corner, 3 on an edge,
   4 in the interior**.
 - A cell that explodes clears itself and sends one orb to each orthogonal
   neighbour, converting enemy orbs to the exploding player.
-- Cascades resolve automatically. A player with no orbs left loses.
+- Cascades resolve automatically. A player with no orbs left is eliminated; the
+  last player with orbs wins. Solo mode is a non-ending practice board.
 
-The app opens on a home screen with **Play**, **New game** (when a match is
-saved), and **How to play**. **Play** opens the match; the active player's panel
-is highlighted and the compact game bar names them. The in-match menu offers
-How to play, Restart, and Back to home. When the game ends, a result dialog
-appears and the board is locked until you start a new game. See
-[`docs/UI.md`](docs/UI.md).
+The app opens on a home screen with **Resume**, **New game**, **Settings**,
+**How to play**, and **About**.
+
+- **Resume** restores an unfinished saved match. It is disabled when there is
+  no save or the last match is finished.
+- **New game** starts a fresh match and discards any previous save.
+- **Settings** controls difficulty (UI placeholder for the future bot), grid
+  size, number of players, per-player names and colours, sound, and vibration.
+  Changes are saved immediately.
+- The in-match menu offers How to play, Restart, and Back to home. When the game
+  ends, a result dialog appears and the board is locked until you start again.
+
+See [`docs/UI.md`](docs/UI.md) for the full screen and component reference.
 
 ---
 
@@ -68,11 +77,11 @@ Color Wars/
 │   ├── main.ts         # Bootstrap and lifecycle persistence
 │   ├── engine/         # Pure rules: types, board, cascade, moves, winner
 │   ├── ui/             # shell, board, HUD, overlay, animations, controller
-│   ├── platform/       # storage adapter and haptics
+│   ├── platform/       # storage, settings, sound, and haptics adapters
 │   └── styles/         # tokens.css and app.css
 ├── tests/
 │   ├── engine/         # board, moves, cascades, winner, stress
-│   ├── platform/       # save schema and storage adapter
+│   ├── platform/       # save schema, settings, and storage adapters
 │   └── ui/             # jsdom app tests
 ├── android/            # Phase 3 target: Capacitor Android project
 ├── legacy/
@@ -98,7 +107,7 @@ Phase 3 target and does not exist yet.
 
 ```powershell
 npm ci
-npm test               # 58 engine, storage, and UI tests
+npm test               # 87 engine, settings, storage, and UI tests
 npm run typecheck
 npm run build          # Vite production build in dist/
 npx cap sync android   # Phase 3
@@ -159,7 +168,8 @@ regression coverage in the test suite.
 | 0 | git baseline, archive `legacy/main.py`, keep the legacy web build runnable | done |
 | 1 | pure TypeScript engine (`src/engine/`) + Vitest suite, no visual change | done |
 | 2 | rebuild the UI on the engine: visible turn banner, win overlay, restart, save/resume, accessibility | done |
-| 3 | Capacitor 8 shell, Android project, device matrix | next |
+| 2.5 | home menu, settings, 1–4 players, dynamic grids, names/colours, sound and vibration toggles | done |
+| 3 | Capacitor 8 shell, Android project, Preferences persistence hardening, device matrix | next |
 | 4 | signing, release build, Play checklist, hardening | planned |
 
 Definition of "stable" for the Android release: see

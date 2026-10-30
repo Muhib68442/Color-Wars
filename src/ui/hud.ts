@@ -4,28 +4,50 @@ import {
   type GameState,
   type Player,
 } from "../engine/index.js";
+import type { PlayerProfile } from "../platform/settings.js";
+import { softenColor } from "../platform/settings.js";
 import type { ScoreCard } from "./shell.js";
 
-const PLAYERS: Player[] = [1, 2];
+const PLAYERS: Player[] = [1, 2, 3, 4];
 
 export interface HudRefs {
   status: HTMLElement;
   scores: Record<Player, ScoreCard>;
+  getProfiles: () => Record<Player, PlayerProfile>;
 }
 
 export interface Hud {
   render(state: GameState): void;
 }
 
+function displayName(
+  profiles: Record<Player, PlayerProfile>,
+  player: Player,
+): string {
+  return profiles[player].name.trim() || `Player ${player}`;
+}
+
 export function createHud(refs: HudRefs): Hud {
   return {
     render(state) {
+      const profiles = refs.getProfiles();
       const active = state.gameOver ? null : state.currentPlayer;
 
       for (const player of PLAYERS) {
         const score = refs.scores[player];
+        const visible = player <= state.playerCount;
+        const playerName = displayName(profiles, player);
+
+        score.root.hidden = !visible;
+        score.root.setAttribute("aria-label", `${playerName} score`);
+        score.name.textContent = playerName;
         score.cells.textContent = String(countCells(state.board, player));
         score.orbs.textContent = String(countOrbs(state.board, player));
+        score.root.style.setProperty("--pc", profiles[player].color);
+        score.root.style.setProperty(
+          "--pc-soft",
+          softenColor(profiles[player].color),
+        );
         score.root.classList.toggle("is-active", active === player);
         score.root.dataset.active = active === player ? "true" : "false";
       }
@@ -34,15 +56,18 @@ export function createHud(refs: HudRefs): Hud {
         refs.status.textContent =
           state.winner === null
             ? "It's a draw."
-            : `Player ${state.winner} wins!`;
+            : `${displayName(profiles, state.winner)} wins!`;
         refs.status.dataset.player =
           state.winner === null ? "" : String(state.winner);
         refs.status.classList.add("is-over");
-      } else {
-        refs.status.textContent = `Player ${state.currentPlayer} to move`;
-        refs.status.dataset.player = String(state.currentPlayer);
-        refs.status.classList.remove("is-over");
+        return;
       }
+
+      const name = displayName(profiles, state.currentPlayer);
+      refs.status.textContent =
+        state.playerCount === 1 ? `${name} · solo practice` : `${name} to move`;
+      refs.status.dataset.player = String(state.currentPlayer);
+      refs.status.classList.remove("is-over");
     },
   };
 }

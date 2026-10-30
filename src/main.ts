@@ -2,6 +2,8 @@ import "./styles/tokens.css";
 import "./styles/app.css";
 
 import { createHaptics } from "./platform/haptics.js";
+import { createSettingsStore } from "./platform/settings.js";
+import { createSound } from "./platform/sound.js";
 import { browserStore, createStorage } from "./platform/storage.js";
 import { createApp } from "./ui/app.js";
 
@@ -11,9 +13,13 @@ if (root === null) {
   throw new Error("Color Wars could not start: #app is missing.");
 }
 
+const store = browserStore();
+
 const app = createApp(root, {
-  storage: createStorage(browserStore()),
+  storage: createStorage(store),
+  settings: createSettingsStore(store),
   haptics: createHaptics(),
+  sound: createSound(),
 });
 
 function persist(): void {

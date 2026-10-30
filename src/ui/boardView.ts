@@ -3,11 +3,22 @@ import {
   isLegalMove,
   type CellRef,
   type GameState,
+  type Player,
 } from "../engine/index.js";
+import {
+  readableAlt,
+  readableInk,
+  strengthenColor,
+  type PlayerProfile,
+} from "../platform/settings.js";
 
 interface CellView {
   button: HTMLButtonElement;
   orbs: HTMLSpanElement[];
+}
+
+export interface BoardViewOptions {
+  getProfiles: () => Record<Player, PlayerProfile>;
 }
 
 export interface BoardView {
@@ -37,6 +48,7 @@ function clamp(value: number, min: number, max: number): number {
 
 function labelFor(
   state: GameState,
+  profiles: Record<Player, PlayerProfile>,
   row: number,
   col: number,
   orbs: number,
@@ -49,12 +61,14 @@ function labelFor(
     return `${position}, empty`;
   }
 
-  return `${position}, Player ${cell.owner}, ${orbs} of ${capacity} orbs`;
+  const name = profiles[cell.owner].name.trim() || `Player ${cell.owner}`;
+  return `${position}, ${name}, ${orbs} of ${capacity} orbs`;
 }
 
 export function createBoardView(
   element: HTMLElement,
   onSelect: (ref: CellRef) => void,
+  options: BoardViewOptions,
 ): BoardView {
   const cells = new Map<string, CellView>();
   let rows = 0;
@@ -147,16 +161,33 @@ export function createBoardView(
         const capacity = capacityAt(state.rows, state.cols, row, col);
         const legal = isLegal(state, { row, col });
         const orbs = cell?.orbs ?? 0;
+        const profiles = options.getProfiles();
+        const profile = cell === null ? null : profiles[cell.owner];
 
         node.button.dataset.orbs = String(orbs);
         node.button.dataset.capacity = String(capacity);
         node.button.title = cell
-          ? `Player ${cell.owner}: ${orbs} / ${capacity} orbs`
+          ? `${profile?.name ?? `Player ${cell.owner}`}: ${orbs} / ${capacity} orbs`
           : "Empty cell";
         node.button.setAttribute(
           "aria-label",
-          labelFor(state, row, col, orbs, capacity),
+          labelFor(state, profiles, row, col, orbs, capacity),
         );
+
+        if (profile === null) {
+          node.button.style.removeProperty("--pc");
+          node.button.style.removeProperty("--pc-strong");
+          node.button.style.removeProperty("--orb-ink");
+          node.button.style.removeProperty("--orb-alt");
+        } else {
+          node.button.style.setProperty("--pc", profile.color);
+          node.button.style.setProperty(
+            "--pc-strong",
+            strengthenColor(profile.color),
+          );
+          node.button.style.setProperty("--orb-ink", readableInk(profile.color));
+          node.button.style.setProperty("--orb-alt", readableAlt(profile.color));
+        }
         node.button.setAttribute(
           "aria-disabled",
           legal ? "false" : "true",

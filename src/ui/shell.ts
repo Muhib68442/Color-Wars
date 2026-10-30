@@ -3,8 +3,27 @@ import { requireElement } from "./query.js";
 
 export interface ScoreCard {
   root: HTMLElement;
+  name: HTMLElement;
   cells: HTMLElement;
   orbs: HTMLElement;
+}
+
+export interface PlayerRowRefs {
+  root: HTMLElement;
+  color: HTMLInputElement;
+  name: HTMLInputElement;
+}
+
+export interface SettingsRefs {
+  difficultyButtons: HTMLButtonElement[];
+  playerCountButtons: HTMLButtonElement[];
+  gridValue: HTMLElement;
+  gridMinus: HTMLButtonElement;
+  gridPlus: HTMLButtonElement;
+  playerRows: Record<Player, PlayerRowRefs>;
+  sound: HTMLInputElement;
+  vibration: HTMLInputElement;
+  reset: HTMLButtonElement;
 }
 
 export interface Shell {
@@ -12,15 +31,23 @@ export interface Shell {
   home: HTMLElement;
   game: HTMLElement;
   info: HTMLElement;
+  settings: HTMLElement;
+  about: HTMLElement;
+  match: HTMLElement;
   status: HTMLElement;
   board: HTMLElement;
-  playButton: HTMLButtonElement;
+  resumeButton: HTMLButtonElement;
   newGameButton: HTMLButtonElement;
+  settingsButton: HTMLButtonElement;
   howToButton: HTMLButtonElement;
+  aboutButton: HTMLButtonElement;
   saveNote: HTMLElement;
   menuButton: HTMLButtonElement;
   infoBack: HTMLButtonElement;
+  settingsBack: HTMLButtonElement;
+  aboutBack: HTMLButtonElement;
   scores: Record<Player, ScoreCard>;
+  settingsRefs: SettingsRefs;
   overlay: HTMLDialogElement;
 }
 
@@ -30,7 +57,7 @@ const LOGO = /* html */ `
       stroke="#cfd0d6" stroke-width="3" />
     <circle cx="40" cy="40" r="11" fill="#6e6eff" />
     <circle cx="80" cy="40" r="11" fill="#ffffff" stroke="#3a0b0b" stroke-width="5" />
-    <circle cx="40" cy="80" r="11" fill="#6e6eff" />
+    <circle cx="40" cy="80" r="11" fill="#ff5959" />
     <circle cx="80" cy="80" r="11" fill="#ffffff" stroke="#3a0b0b" stroke-width="5" />
     <circle cx="60" cy="60" r="7" fill="#14161a" opacity="0.25" />
   </svg>
@@ -51,26 +78,79 @@ const BACK_ICON = /* html */ `
   </svg>
 `;
 
+function scoreCard(
+  player: Player,
+  variant: "score--bar" | "score--rail",
+  hidden = false,
+): string {
+  return /* html */ `
+    <article
+      class="score ${variant}"
+      data-player="${player}"
+      aria-label="Player ${player} score"
+      ${hidden ? "hidden" : ""}
+    >
+      <h2 class="score__name" data-role="name">Player ${player}</h2>
+      <p class="score__stats">
+        <span><b data-role="cells">0</b> cells</span>
+        <span><b data-role="orbs">0</b> orbs</span>
+      </p>
+    </article>
+  `;
+}
+
+function playerRow(player: Player): string {
+  return /* html */ `
+    <div class="player-row" data-player="${player}">
+      <input
+        class="player-row__color"
+        type="color"
+        data-role="player-color"
+        aria-label="Player ${player} colour"
+      />
+      <label class="player-row__name">
+        <span class="player-row__label">Player ${player}</span>
+        <input
+          type="text"
+          data-role="player-name"
+          maxlength="16"
+          autocomplete="off"
+          spellcheck="false"
+          aria-label="Player ${player} name"
+        />
+      </label>
+    </div>
+  `;
+}
+
 const SHELL_TEMPLATE = /* html */ `
   <section class="screen screen--home" data-role="home" aria-labelledby="home-title">
     <div class="home__logo">${LOGO}</div>
     <h1 class="home__title" id="home-title">Color Wars</h1>
     <p class="home__desc">
-      A two-player chain reaction game. Place orbs, set off explosions, and
-      capture the whole board.
+      A chain reaction game for one to four players. Place orbs, set off
+      explosions, and capture the whole board.
     </p>
     <div class="home__actions">
-      <button class="btn btn--primary btn--large" type="button" data-action="play">
-        Play
+      <button class="btn btn--primary btn--large" type="button" data-action="resume">
+        Resume
       </button>
-      <button class="btn btn--secondary" type="button" data-action="new-game" hidden>
+      <button class="btn btn--secondary btn--large" type="button" data-action="new-game">
         New game
       </button>
-      <button class="btn btn--quiet" type="button" data-action="how-to">
-        How to play
-      </button>
+      <div class="home__links">
+        <button class="btn btn--quiet" type="button" data-action="settings">
+          Settings
+        </button>
+        <button class="btn btn--quiet" type="button" data-action="how-to">
+          How to play
+        </button>
+        <button class="btn btn--quiet" type="button" data-action="about">
+          About
+        </button>
+      </div>
     </div>
-    <p class="home__note" data-role="save-note" hidden></p>
+    <p class="home__note" data-role="save-note"></p>
   </section>
 
   <section class="screen screen--game" data-role="game" hidden aria-label="Match">
@@ -82,30 +162,26 @@ const SHELL_TEMPLATE = /* html */ `
       <span class="gamebar__spacer" aria-hidden="true"></span>
     </header>
 
-    <article class="score score--bar" data-player="2" aria-label="Player 2 score">
-      <h2 class="score__name">Player 2</h2>
-      <p class="score__stats">
-        <span><b data-role="cells">0</b> cells</span>
-        <span><b data-role="orbs">0</b> orbs</span>
-      </p>
-    </article>
+    <div class="match" data-role="match">
+      ${scoreCard(3, "score--rail", true)}
 
-    <main class="stage">
-      <div
-        class="board"
-        data-role="board"
-        role="group"
-        aria-label="Board, 7 by 7"
-      ></div>
-    </main>
+      <div class="match__center">
+        ${scoreCard(2, "score--bar")}
 
-    <article class="score score--bar" data-player="1" aria-label="Player 1 score">
-      <h2 class="score__name">Player 1</h2>
-      <p class="score__stats">
-        <span><b data-role="cells">0</b> cells</span>
-        <span><b data-role="orbs">0</b> orbs</span>
-      </p>
-    </article>
+        <main class="stage">
+          <div
+            class="board"
+            data-role="board"
+            role="group"
+            aria-label="Board, 7 by 7"
+          ></div>
+        </main>
+
+        ${scoreCard(1, "score--bar")}
+      </div>
+
+      ${scoreCard(4, "score--rail", true)}
+    </div>
   </section>
 
   <section class="screen screen--info" data-role="info" hidden aria-labelledby="info-title">
@@ -119,14 +195,15 @@ const SHELL_TEMPLATE = /* html */ `
 
     <div class="info">
       <p class="info__lead">
-        Color Wars is a hot-seat game for two players sharing one device.
-        Player 2 plays from the top panel, Player 1 from the bottom panel.
+        Color Wars is a hot-seat game for one to four players sharing one
+        device. Player 2 sits above the board, Player 1 below it, and Players 3
+        and 4 on the left and right when four are playing.
       </p>
 
       <h3>Goal</h3>
       <p>
         Capture every orb on the board. A player with no orbs left after a
-        cascade loses.
+        cascade is eliminated; the last player with orbs wins.
       </p>
 
       <h3>On your turn</h3>
@@ -134,7 +211,7 @@ const SHELL_TEMPLATE = /* html */ `
         <li>Place a new orb on any empty cell, or</li>
         <li>add one orb to a cell you already own.</li>
       </ul>
-      <p>Turns then alternate.</p>
+      <p>Turns then pass to the next player in order.</p>
 
       <h3>Explosions</h3>
       <p>
@@ -150,8 +227,9 @@ const SHELL_TEMPLATE = /* html */ `
 
       <h3>Winning</h3>
       <p>
-        After a cascade settles, a player with no orbs left loses. If both
-        players still own orbs, play continues.
+        After a cascade settles, a player with no orbs left is eliminated. If
+        one player still owns orbs, they win. Solo mode is a practice board with
+        no opponent.
       </p>
 
       <h3>Controls</h3>
@@ -161,13 +239,156 @@ const SHELL_TEMPLATE = /* html */ `
           Keyboard: Tab into the board, move with the arrow keys or Home/End,
           and press Enter or Space to place.
         </li>
-        <li>Use the menu button for How to play, Restart, or Home.</li>
+        <li>Use the menu button for How to play, Restart, or Back to home.</li>
       </ul>
 
       <h3>Tip</h3>
       <p>
         Corners only need 2 orbs to pop, so they are easy to flip, while edge
         and middle cells hold more and fire in more directions.
+      </p>
+    </div>
+  </section>
+
+  <section class="screen screen--settings" data-role="settings" hidden aria-labelledby="settings-title">
+    <header class="infobar">
+      <button class="iconbtn" type="button" data-action="settings-back" aria-label="Back">
+        ${BACK_ICON}
+      </button>
+      <h2 class="infobar__title" id="settings-title">Settings</h2>
+      <span class="gamebar__spacer" aria-hidden="true"></span>
+    </header>
+
+    <div class="settings">
+      <section class="panel" aria-labelledby="settings-match">
+        <h3 class="panel__title" id="settings-match">Match</h3>
+
+        <div class="field">
+          <div class="field__head">
+            <span class="field__label">Difficulty</span>
+            <span class="badge">Bot · soon</span>
+          </div>
+          <div class="segmented" data-role="difficulty" role="group" aria-label="Difficulty">
+            <button type="button" data-difficulty="easy" aria-pressed="false">Easy</button>
+            <button type="button" data-difficulty="medium" aria-pressed="false">Medium</button>
+            <button type="button" data-difficulty="hard" aria-pressed="false">Hard</button>
+          </div>
+          <p class="field__hint">
+            Difficulty will drive the solo bot in a later phase. The choice is
+            saved now.
+          </p>
+        </div>
+
+        <div class="field">
+          <span class="field__label">Grid size</span>
+          <div class="stepper">
+            <button class="stepper__btn" type="button" data-action="grid-minus" aria-label="Decrease grid size">
+              −
+            </button>
+            <output class="stepper__value" data-role="grid-value" aria-live="polite">7 × 7</output>
+            <button class="stepper__btn" type="button" data-action="grid-plus" aria-label="Increase grid size">
+              +
+            </button>
+          </div>
+          <p class="field__hint">
+            Square board from 7 × 7 to 15 × 15. Applies to new games.
+          </p>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="settings-players">
+        <h3 class="panel__title" id="settings-players">Players</h3>
+
+        <div class="field">
+          <span class="field__label">Number of players</span>
+          <div class="segmented" data-role="player-count" role="group" aria-label="Number of players">
+            <button type="button" data-count="1" aria-pressed="false">1</button>
+            <button type="button" data-count="2" aria-pressed="false">2</button>
+            <button type="button" data-count="3" aria-pressed="false">3</button>
+            <button type="button" data-count="4" aria-pressed="false">4</button>
+          </div>
+          <p class="field__hint">
+            Players 3 and 4 appear on the left and right of the board.
+          </p>
+        </div>
+
+        <div class="player-list" data-role="player-list">
+          ${[1, 2, 3, 4].map((value) => playerRow(value as Player)).join("")}
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="settings-feedback">
+        <h3 class="panel__title" id="settings-feedback">Feedback</h3>
+
+        <label class="switch">
+          <span class="switch__copy">
+            <span class="switch__title">Sound</span>
+            <span class="switch__hint">Place, explosion, and win cues</span>
+          </span>
+          <input type="checkbox" data-setting="sound" />
+          <span class="switch__track" aria-hidden="true"></span>
+        </label>
+
+        <label class="switch">
+          <span class="switch__copy">
+            <span class="switch__title">Vibration</span>
+            <span class="switch__hint">Short haptic feedback on moves</span>
+          </span>
+          <input type="checkbox" data-setting="vibration" />
+          <span class="switch__track" aria-hidden="true"></span>
+        </label>
+      </section>
+
+      <button class="btn btn--quiet settings__reset" type="button" data-action="reset-settings">
+        Reset to defaults
+      </button>
+    </div>
+  </section>
+
+  <section class="screen screen--about" data-role="about" hidden aria-labelledby="about-title">
+    <header class="infobar">
+      <button class="iconbtn" type="button" data-action="about-back" aria-label="Back">
+        ${BACK_ICON}
+      </button>
+      <h2 class="infobar__title" id="about-title">About</h2>
+      <span class="gamebar__spacer" aria-hidden="true"></span>
+    </header>
+
+    <div class="info about">
+      <div class="about__brand">
+        <div class="about__logo">${LOGO}</div>
+        <h3 class="about__name">Color Wars</h3>
+        <p class="about__version">Version 0.2.0</p>
+      </div>
+
+      <p>
+        A local chain reaction game for one to four players. Place orbs, trigger
+        cascades, and be the last colour on the board.
+      </p>
+
+      <h3>Built for one device</h3>
+      <p>
+        Everyone shares the same screen. Player 1 sits at the bottom, Player 2
+        at the top, and Players 3 and 4 on the left and right for four-player
+        matches.
+      </p>
+
+      <h3>Private and offline</h3>
+      <p>
+        No accounts, no ads, no tracking, and no network requests. Saves and
+        settings stay in this device's local storage.
+      </p>
+
+      <h3>Tech</h3>
+      <p>
+        TypeScript and Vite, with a pure rules engine and a DOM renderer.
+        Packaged for Android with Capacitor.
+      </p>
+
+      <h3>Credits</h3>
+      <p>
+        Game design and code by the Color Wars project. Built as a modern
+        rewrite of the original Pygame prototype.
       </p>
     </div>
   </section>
@@ -186,12 +407,28 @@ const SHELL_TEMPLATE = /* html */ `
   </dialog>
 `;
 
-function scoreCard(root: HTMLElement, player: Player): ScoreCard {
-  const card = requireElement<HTMLElement>(root, `.score[data-player="${player}"]`);
+function scoreCardRefs(root: HTMLElement, player: Player): ScoreCard {
+  const card = requireElement<HTMLElement>(
+    root,
+    `.score[data-player="${player}"]`,
+  );
   return {
     root: card,
+    name: requireElement<HTMLElement>(card, "[data-role='name']"),
     cells: requireElement<HTMLElement>(card, "[data-role='cells']"),
     orbs: requireElement<HTMLElement>(card, "[data-role='orbs']"),
+  };
+}
+
+function playerRowRefs(root: HTMLElement, player: Player): PlayerRowRefs {
+  const row = requireElement<HTMLElement>(
+    root,
+    `.player-row[data-player="${player}"]`,
+  );
+  return {
+    root: row,
+    color: requireElement<HTMLInputElement>(row, "[data-role='player-color']"),
+    name: requireElement<HTMLInputElement>(row, "[data-role='player-name']"),
   };
 }
 
@@ -204,16 +441,30 @@ export function mountShell(root: HTMLElement): Shell {
     home: requireElement<HTMLElement>(root, "[data-role='home']"),
     game: requireElement<HTMLElement>(root, "[data-role='game']"),
     info: requireElement<HTMLElement>(root, "[data-role='info']"),
+    settings: requireElement<HTMLElement>(root, "[data-role='settings']"),
+    about: requireElement<HTMLElement>(root, "[data-role='about']"),
+    match: requireElement<HTMLElement>(root, "[data-role='match']"),
     status: requireElement<HTMLElement>(root, "[data-role='status']"),
     board: requireElement<HTMLElement>(root, "[data-role='board']"),
-    playButton: requireElement<HTMLButtonElement>(root, "[data-action='play']"),
+    resumeButton: requireElement<HTMLButtonElement>(
+      root,
+      "[data-action='resume']",
+    ),
     newGameButton: requireElement<HTMLButtonElement>(
       root,
       "[data-action='new-game']",
     ),
+    settingsButton: requireElement<HTMLButtonElement>(
+      root,
+      "[data-action='settings']",
+    ),
     howToButton: requireElement<HTMLButtonElement>(
       root,
       "[data-action='how-to']",
+    ),
+    aboutButton: requireElement<HTMLButtonElement>(
+      root,
+      "[data-action='about']",
     ),
     saveNote: requireElement<HTMLElement>(root, "[data-role='save-note']"),
     menuButton: requireElement<HTMLButtonElement>(root, "[data-action='menu']"),
@@ -221,7 +472,52 @@ export function mountShell(root: HTMLElement): Shell {
       root,
       "[data-action='info-back']",
     ),
-    scores: { 1: scoreCard(root, 1), 2: scoreCard(root, 2) },
+    settingsBack: requireElement<HTMLButtonElement>(
+      root,
+      "[data-action='settings-back']",
+    ),
+    aboutBack: requireElement<HTMLButtonElement>(
+      root,
+      "[data-action='about-back']",
+    ),
+    scores: {
+      1: scoreCardRefs(root, 1),
+      2: scoreCardRefs(root, 2),
+      3: scoreCardRefs(root, 3),
+      4: scoreCardRefs(root, 4),
+    },
+    settingsRefs: {
+      difficultyButtons: Array.from(
+        root.querySelectorAll<HTMLButtonElement>("[data-difficulty]"),
+      ),
+      playerCountButtons: Array.from(
+        root.querySelectorAll<HTMLButtonElement>("[data-count]"),
+      ),
+      gridValue: requireElement<HTMLElement>(root, "[data-role='grid-value']"),
+      gridMinus: requireElement<HTMLButtonElement>(
+        root,
+        "[data-action='grid-minus']",
+      ),
+      gridPlus: requireElement<HTMLButtonElement>(
+        root,
+        "[data-action='grid-plus']",
+      ),
+      playerRows: {
+        1: playerRowRefs(root, 1),
+        2: playerRowRefs(root, 2),
+        3: playerRowRefs(root, 3),
+        4: playerRowRefs(root, 4),
+      },
+      sound: requireElement<HTMLInputElement>(root, "[data-setting='sound']"),
+      vibration: requireElement<HTMLInputElement>(
+        root,
+        "[data-setting='vibration']",
+      ),
+      reset: requireElement<HTMLButtonElement>(
+        root,
+        "[data-action='reset-settings']",
+      ),
+    },
     overlay: requireElement<HTMLDialogElement>(root, "[data-role='overlay']"),
   };
 }

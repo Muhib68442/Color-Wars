@@ -15,9 +15,57 @@ describe("createGame", () => {
 
     expect(state.rows).toBe(7);
     expect(state.cols).toBe(7);
+    expect(state.playerCount).toBe(2);
     expect(state.currentPlayer).toBe(1);
     expect(state.gameOver).toBe(false);
     expect(state.board.flat().every((value) => value === null)).toBe(true);
+  });
+
+  it("creates a custom square grid with the requested player count", () => {
+    const state = createGame(11, 11, 4);
+
+    expect(state.rows).toBe(11);
+    expect(state.cols).toBe(11);
+    expect(state.playerCount).toBe(4);
+    expect(state.board).toHaveLength(11);
+    expect(state.board[0]).toHaveLength(11);
+  });
+});
+
+describe("turns", () => {
+  it("cycles through three and four players in order", () => {
+    let three = createGame(7, 7, 3);
+    three = applyMove(three, { row: 0, col: 0 }).state;
+    expect(three.currentPlayer).toBe(2);
+
+    three = applyMove(three, { row: 0, col: 1 }).state;
+    expect(three.currentPlayer).toBe(3);
+
+    three = applyMove(three, { row: 0, col: 2 }).state;
+    expect(three.currentPlayer).toBe(1);
+
+    let four = createGame(7, 7, 4);
+    const expected = [2, 3, 4, 1];
+    for (let turn = 0; turn < expected.length; turn += 1) {
+      four = applyMove(four, { row: 0, col: turn }).state;
+      expect(four.currentPlayer).toBe(expected[turn]);
+    }
+  });
+
+  it("skips an eliminated player", () => {
+    const board = emptyBoard(7, 7);
+    setCell(board, 0, 0, cell(1, 1));
+    setCell(board, 6, 6, cell(3, 1));
+    setCell(board, 6, 0, cell(4, 1));
+    const state = makeState(board, {
+      currentPlayer: 1,
+      playerCount: 4,
+      hasPlayed: { 1: true, 2: true, 3: true, 4: true },
+    });
+
+    const result = applyMove(state, { row: 0, col: 0 });
+
+    expect(result.state.currentPlayer).toBe(3);
   });
 });
 

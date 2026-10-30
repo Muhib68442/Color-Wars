@@ -4,7 +4,7 @@ This document is the contract for turning Color Wars into a stable Android app.
 It covers what "any Android" realistically means, how the APK is built, how every
 game feature maps to the Android shell, and the tests that gate a release.
 
-> **Status:** plan. The engine and UI are being rebuilt first (see
+> **Status:** plan. The engine, UI, settings, and save/resume are complete (see
 > [`ARCHITECTURE.md`](ARCHITECTURE.md) §4.4). The Capacitor shell is Phase 3.
 > Nothing in this document is shipped yet.
 
@@ -48,7 +48,7 @@ No app can guarantee every Android device ever made. The supported contract is:
 | WebView | Chromium **87+** (2020) | System WebView updates through Play Store |
 | Architecture | arm64-v8a, armeabi-v7a, x86_64 | No native libs, so all are supported |
 | Screen | 320 dp wide and up | Phones, tablets, foldables |
-| RAM | 1 GB | The game is 49 DOM nodes; WebView is the floor |
+| RAM | 1 GB | The game is at most 225 DOM nodes; WebView is the floor |
 | Network | **none required** | Fully offline after install |
 
 Explicitly **not** supported:
@@ -230,20 +230,23 @@ v1.0.
 
 | Feature | Implementation | Verification |
 | --- | --- | --- |
-| 7×7 board, local 2-player | Pure engine + DOM grid | Engine tests; tap on device |
+| 7×7–15×15 square board, local 1–4 players | Pure engine + DOM grid | Engine tests; tap on device |
 | Place on empty / own cell | `applyMove` legality | Unit tests; UI test |
 | Corner 2 / edge 3 / interior 4 | `capacityAt` | Unit tests |
 | Cascades and ownership conversion | `resolveCascades` events | Unit tests; animation replay |
 | Turn indicator | Visible HUD (not hidden) | Visual check |
+| Multi-player elimination | `alivePlayers` + `nextPlayer` | Unit + UI test |
+| Solo practice board | `playerCount === 1` never ends | Unit + UI test |
 | Win detection + overlay | `evaluateWinner` + modal | Automated + manual |
 | Restart | New `createGame()` | Manual |
 | Input lock after win | `gameOver` guard | Unit + UI test |
 | Save / resume | Preferences on pause and after each move | Process-death test |
+| Settings (grid, players, names, colours, feedback) | `platform/settings.ts`, stored separately | Reload/process-death test |
 | Android back button | `@capacitor/app` listener | Hardware/gesture test |
 | Rotation / split screen | Responsive CSS + safe areas | Matrix test |
 | Offline launch | Bundled assets | Airplane-mode test |
-| Sound (optional) | Local audio, unlocked on first tap | Mute/background test |
-| Haptics (optional) | `@capacitor/haptics` | Device test |
+| Sound (optional) | Web Audio cues, gated by setting | Mute/background test |
+| Haptics (optional) | `@capacitor/haptics`, gated by setting | Device test |
 | Accessibility | Semantic buttons, labels, live regions | TalkBack test |
 | App icon / splash | Adaptive icon + splash | Launcher check |
 | Signed release | Gradle signing config | `apksigner verify` |
@@ -270,12 +273,16 @@ server; it does not change the packaging model.
 - Save after every accepted move (debounced ~150 ms) and on `pause`.
 - Save schema:
   ```ts
-  type SaveV1 = { version: 1; state: GameState; savedAt: number };
+  type SaveV2 = { version: 2; state: GameState; savedAt: number };
   ```
-- On launch: validate the schema, check board shape and invariants. If anything
-  is invalid, start a new game instead of restoring a corrupt state.
+  `GameState` carries `playerCount` (1–4) and `hasPlayed` for all four seats.
+- Settings are stored separately under `color-wars:settings` as
+  `{ version: 1, settings: GameSettings }`.
+- On launch: validate the schema, check board shape, player count, owner range,
+  and stability. If anything is invalid — including a version-1 save — start a
+  new game instead of restoring a corrupt state.
 - Use `@capacitor/preferences` on Android; `localStorage` on web. Keep the
-  adapter interface identical.
+  `KeyValueStore` adapter interface identical for both save and settings.
 - Test process death with Developer Options → **Don't keep activities**, and by
   force-stopping the app mid-game.
 
@@ -299,14 +306,19 @@ Test the gesture navigation and predictive back on Android 13+.
 - Prefer `unspecified` orientation with a responsive square board:
   ```css
   .board {
-    width: min(92vw, 60vh, 560px);
+    width: min(100%, 52vh, 560px);
     aspect-ratio: 1;
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 2px;
+    grid-template-columns: repeat(var(--cols, 7), minmax(0, 1fr));
+    gap: clamp(1px, 0.7vw, 6px);
   }
   ```
-- Touch targets must stay at least **48 dp**; scale cells with the board.
+- Touch targets must stay at least **48 dp**; scale cells with the board. At
+  15×15 on a narrow phone, cells fall below 48 dp, so add a zoom/inspect
+  affordance or accept the smaller visual target with a larger hit area before
+  release.
+- In four-player mode, keep the P3/P4 side rails readable in portrait; they are
+  already collapsible to 48 px below 520 px.
 - Do not lock orientation unless product decides to; tablets and foldables
   should work in both.
 - Test split-screen and foldable posture changes.
@@ -318,18 +330,25 @@ Test the gesture navigation and predictive back on Android 13+.
   maximum.
 - Cells are real `<button>`s with `aria-label` (row, column, owner, orbs).
 - Turn and win messages live in `aria-live="polite"` regions.
-- Ownership must not rely on colour alone; add a ring/pattern or label.
+- Ownership must not rely on colour alone; the web build already uses a distinct
+  orb fill/ring per player and a text "playing"/"turn" pill.
 - Test with TalkBack. The WebView exposes the DOM accessibility tree; semantic
   elements are required.
 - Respect `prefers-reduced-motion` for cascade animations.
 
 ### 6.6 Sound and haptics
 
-- Local short audio files only; no streaming.
-- Unlock audio on the first user gesture (Android autoplay policy).
+- The web build already emits short Web Audio cues for place, explosion, win,
+  and reject, and uses `navigator.vibrate` for haptics.
+- Audio unlocks on the first user gesture (Android autoplay policy); a rejected
+  move before any gesture is silent rather than a crash.
 - Pause/mute audio on `pause` and when the app loses focus.
-- Provide a mute toggle persisted with the save.
-- Haptics are optional and must no-op gracefully on web.
+- The **Sound** and **Vibration** toggles in Settings are persisted under
+  `color-wars:settings` and gate every call.
+- Replace haptics with `@capacitor/haptics` behind the existing `Haptics`
+  interface; it must no-op gracefully on web.
+- If WebView audio misbehaves in the background, swap in a native audio plugin
+  behind the existing `Sound` interface without touching the controller.
 
 ### 6.7 Error handling
 
@@ -343,7 +362,7 @@ Test the gesture navigation and predictive back on Android 13+.
 
 ### 6.8 Performance
 
-- 49 DOM nodes; animate with CSS transforms/opacity, not layout properties.
+- 49–225 DOM nodes; animate with CSS transforms/opacity, not layout properties.
 - Replay cascade events with `requestAnimationFrame`, capped so a long chain
   cannot freeze the UI.
 - Target: first interactive frame under 1 s on a mid-range device, 60 fps
@@ -537,7 +556,12 @@ available, an **armeabi-v7a** device.
 - [ ] Clean install, first launch in airplane mode.
 - [ ] Cold start, warm start, resume after hours.
 - [ ] Play a full game to a win; restart; play again.
+- [ ] Play 1-, 2-, 3-, and 4-player matches; confirm rails and turn order.
+- [ ] Change grid size to 15×15 and player count; start a new game; confirm.
+- [ ] Rename players, choose colours, and verify contrast on the board.
+- [ ] Toggle sound and vibration off; confirm both stay off after relaunch.
 - [ ] Force-stop mid-game; relaunch; state restored.
+- [ ] Upgrade from a version-1 save; confirm it is dropped, not half-loaded.
 - [ ] Developer Options → Don't keep activities; rotate mid-game.
 - [ ] Rotate, split screen, foldable posture change.
 - [ ] Hardware back and gesture back; exit confirmation.
@@ -629,5 +653,6 @@ The Android app is releasable when:
 - Oracle JDK 19 is installed but **should not** be used for Gradle; install
   Android Studio and use its JDK 21.
 - Android Studio, the Android SDK, `adb`, and `gradle` are **not installed yet**.
-- The first real build is blocked on the Phase 1 engine + Phase 2 UI; the shell
-  can be added once `dist/` exists.
+- The engine, UI, settings, and save/resume work (Phase 0–2.5) and `dist/`
+  builds, so the shell can be generated as soon as the Android toolchain is
+  installed.

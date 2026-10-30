@@ -1,9 +1,9 @@
 {
   "name": "color-wars",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
-  "description": "A local two-player Chain Reaction game for web and Android.",
+  "description": "A local chain reaction game for one to four players on web and Android.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

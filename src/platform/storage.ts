@@ -1,10 +1,15 @@
-import { capacityAt, type GameState } from "../engine/index.js";
+import {
+  capacityAt,
+  MAX_GRID_SIZE,
+  MAX_PLAYERS,
+  MIN_GRID_SIZE,
+  MIN_PLAYERS,
+  type GameState,
+  type Player,
+} from "../engine/index.js";
 
 export const SAVE_KEY = "color-wars:save";
-export const SAVE_VERSION = 1;
-
-const BOARD_ROWS = 7;
-const BOARD_COLS = 7;
+export const SAVE_VERSION = 2;
 
 export interface KeyValueStore {
   getItem(key: string): string | null;
@@ -24,55 +29,86 @@ interface SavePayload {
   state: GameState;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function isPlayerInRange(value: unknown, playerCount: number): value is Player {
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= 1 &&
+    value <= playerCount
+  );
+}
+
 /**
- * Accepts only a complete, stable 7x7 board. A corrupt or half-written save
- * must never reach the renderer; the caller starts a new game instead.
+ * Accepts only a complete, stable square board within the supported range.
+ * A corrupt or half-written save must never reach the renderer; the caller
+ * starts a new game instead.
  */
 export function isGameState(value: unknown): value is GameState {
   if (!isRecord(value)) return false;
 
   const rows = value["rows"];
   const cols = value["cols"];
-  if (rows !== BOARD_ROWS || cols !== BOARD_COLS) return false;
+  if (
+    typeof rows !== "number" ||
+    typeof cols !== "number" ||
+    !Number.isInteger(rows) ||
+    !Number.isInteger(cols) ||
+    rows !== cols ||
+    rows < MIN_GRID_SIZE ||
+    rows > MAX_GRID_SIZE
+  ) {
+    return false;
+  }
+
+  const playerCount = value["playerCount"];
+  if (
+    typeof playerCount !== "number" ||
+    !Number.isInteger(playerCount) ||
+    playerCount < MIN_PLAYERS ||
+    playerCount > MAX_PLAYERS
+  ) {
+    return false;
+  }
 
   const board = value["board"];
-  if (!Array.isArray(board) || board.length !== BOARD_ROWS) return false;
+  if (!Array.isArray(board) || board.length !== rows) return false;
 
-  for (let row = 0; row < BOARD_ROWS; row += 1) {
+  for (let row = 0; row < rows; row += 1) {
     const boardRow: unknown = board[row];
-    if (!Array.isArray(boardRow) || boardRow.length !== BOARD_COLS) return false;
+    if (!Array.isArray(boardRow) || boardRow.length !== cols) return false;
 
-    for (let col = 0; col < BOARD_COLS; col += 1) {
+    for (let col = 0; col < cols; col += 1) {
       const cell: unknown = boardRow[col];
       if (cell === null) continue;
       if (!isRecord(cell)) return false;
 
       const owner = cell["owner"];
       const orbs = cell["orbs"];
-      if (owner !== 1 && owner !== 2) return false;
+      if (!isPlayerInRange(owner, playerCount)) return false;
       if (typeof orbs !== "number" || !Number.isInteger(orbs)) return false;
-      if (orbs < 1 || orbs >= capacityAt(BOARD_ROWS, BOARD_COLS, row, col)) {
+      if (orbs < 1 || orbs >= capacityAt(rows, cols, row, col)) {
         return false;
       }
     }
   }
 
   const currentPlayer = value["currentPlayer"];
-  if (currentPlayer !== 1 && currentPlayer !== 2) return false;
+  if (!isPlayerInRange(currentPlayer, playerCount)) return false;
 
   const hasPlayed = value["hasPlayed"];
   if (!isRecord(hasPlayed)) return false;
-  if (typeof hasPlayed["1"] !== "boolean") return false;
-  if (typeof hasPlayed["2"] !== "boolean") return false;
+  for (let player = 1; player <= playerCount; player += 1) {
+    if (typeof hasPlayed[String(player)] !== "boolean") return false;
+  }
 
   if (typeof value["gameOver"] !== "boolean") return false;
 
   const winner = value["winner"];
-  if (winner !== null && winner !== 1 && winner !== 2) return false;
+  if (winner !== null && !isPlayerInRange(winner, playerCount)) return false;
 
   const moveCount = value["moveCount"];
   if (

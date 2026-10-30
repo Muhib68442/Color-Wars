@@ -3,24 +3,35 @@ import {
   createBoard,
   getCell,
   inBounds,
-  other,
+  nextPlayer,
   setCell,
 } from "./board.js";
 import { resolveCascades } from "./cascade.js";
 import { evaluateWinner } from "./winner.js";
-import type { CellRef, GameEvent, GameState, MoveResult } from "./types.js";
+import type {
+  CellRef,
+  GameEvent,
+  GameState,
+  MoveResult,
+  PlayerCount,
+} from "./types.js";
 
 export interface ApplyMoveOptions {
   maxCascadeSteps?: number;
 }
 
-export function createGame(rows = 7, cols = 7): GameState {
+export function createGame(
+  rows = 7,
+  cols = 7,
+  playerCount: PlayerCount = 2,
+): GameState {
   return {
     rows,
     cols,
+    playerCount,
     board: createBoard(rows, cols),
     currentPlayer: 1,
-    hasPlayed: { 1: false, 2: false },
+    hasPlayed: { 1: false, 2: false, 3: false, 4: false },
     gameOver: false,
     winner: null,
     moveCount: 0,
@@ -106,7 +117,7 @@ export function applyMove(
       next.winner = verdict.winner;
       events.push({ type: "win", winner: verdict.winner });
     } else {
-      next.currentPlayer = other(player);
+      next.currentPlayer = nextPlayer(next);
     }
   }
 

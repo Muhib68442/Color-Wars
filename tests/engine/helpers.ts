@@ -1,4 +1,10 @@
-import type { Board, Cell, GameState, Player } from "../../src/engine/types.js";
+import type {
+  Board,
+  Cell,
+  GameState,
+  Player,
+  PlayerCount,
+} from "../../src/engine/types.js";
 
 export function cell(owner: Player, orbs: number): Cell {
   return { owner, orbs };
@@ -10,26 +16,36 @@ export function emptyBoard(rows: number, cols: number): Board {
 
 export interface StateOptions {
   currentPlayer?: Player;
-  hasPlayed?: { 1?: boolean; 2?: boolean };
+  hasPlayed?: Partial<Record<Player, boolean>>;
   gameOver?: boolean;
+  winner?: Player | null;
+  playerCount?: PlayerCount;
+  moveCount?: number;
+  cascadeLimitReached?: boolean;
 }
 
 export function makeState(board: Board, options: StateOptions = {}): GameState {
   const rows = board.length;
   const cols = board[0]?.length ?? 0;
+  const playerCount = options.playerCount ?? 2;
+
+  const hasPlayed = {} as Record<Player, boolean>;
+  for (let index = 1; index <= 4; index += 1) {
+    const player = index as Player;
+    hasPlayed[player] =
+      player <= playerCount ? (options.hasPlayed?.[player] ?? true) : false;
+  }
 
   return {
     rows,
     cols,
+    playerCount,
     board,
     currentPlayer: options.currentPlayer ?? 1,
-    hasPlayed: {
-      1: options.hasPlayed?.[1] ?? true,
-      2: options.hasPlayed?.[2] ?? true,
-    },
+    hasPlayed,
     gameOver: options.gameOver ?? false,
-    winner: null,
-    moveCount: 0,
-    cascadeLimitReached: false,
+    winner: options.winner ?? null,
+    moveCount: options.moveCount ?? 0,
+    cascadeLimitReached: options.cascadeLimitReached ?? false,
   };
 }

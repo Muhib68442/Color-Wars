@@ -1,4 +1,10 @@
-import type { Board, Cell, CellRef, Player } from "./types.js";
+import type {
+  Board,
+  Cell,
+  CellRef,
+  GameState,
+  Player,
+} from "./types.js";
 
 const DIRECTIONS = [
   [-1, 0],
@@ -7,8 +13,17 @@ const DIRECTIONS = [
   [0, -1],
 ] as const;
 
+/** Two-player convenience helper. Prefer `nextPlayer` for 1–4 players. */
 export function other(player: Player): Player {
   return player === 1 ? 2 : 1;
+}
+
+export function playersOf(count: number): Player[] {
+  const players: Player[] = [];
+  for (let index = 1; index <= count; index += 1) {
+    players.push(index as Player);
+  }
+  return players;
 }
 
 export function assertDimensions(rows: number, cols: number): void {
@@ -108,6 +123,34 @@ export function countCells(board: Board, player: Player): number {
     }
   }
   return total;
+}
+
+/**
+ * Players still in the match. A player is alive while they own orbs; players
+ * who have not taken their first turn yet are also kept alive so an opening
+ * placement by Player 1 does not eliminate everyone else.
+ */
+export function alivePlayers(state: GameState): Player[] {
+  const alive: Player[] = [];
+  for (let index = 1; index <= state.playerCount; index += 1) {
+    const player = index as Player;
+    if (!state.hasPlayed[player] || countOrbs(state.board, player) > 0) {
+      alive.push(player);
+    }
+  }
+  return alive;
+}
+
+/** Next player in turn order, skipping players eliminated by a cascade. */
+export function nextPlayer(state: GameState): Player {
+  for (let step = 1; step <= state.playerCount; step += 1) {
+    const player = (((state.currentPlayer - 1 + step) % state.playerCount) +
+      1) as Player;
+    if (!state.hasPlayed[player] || countOrbs(state.board, player) > 0) {
+      return player;
+    }
+  }
+  return state.currentPlayer;
 }
 
 export function isStable(board: Board, rows: number, cols: number): boolean {
