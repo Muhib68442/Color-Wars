@@ -288,24 +288,16 @@ const SHELL_TEMPLATE = /* html */ `
           </div>
           <div class="grid-size">
             <div class="stepper">
-              <button class="stepper__btn" type="button" data-action="grid-rows-minus" aria-label="Decrease rows">
-                −
-              </button>
+              <button class="stepper__btn" type="button" data-action="grid-rows-minus" aria-label="Decrease rows"></button>
               <output class="stepper__value" data-role="grid-rows-value" aria-live="polite">7</output>
-              <button class="stepper__btn" type="button" data-action="grid-rows-plus" aria-label="Increase rows">
-                +
-              </button>
+              <button class="stepper__btn" type="button" data-action="grid-rows-plus" aria-label="Increase rows"></button>
               <span class="stepper__label">rows</span>
             </div>
             <span class="grid-size__by" aria-hidden="true">×</span>
             <div class="stepper">
-              <button class="stepper__btn" type="button" data-action="grid-cols-minus" aria-label="Decrease columns">
-                −
-              </button>
+              <button class="stepper__btn" type="button" data-action="grid-cols-minus" aria-label="Decrease columns"></button>
               <output class="stepper__value" data-role="grid-cols-value" aria-live="polite">7</output>
-              <button class="stepper__btn" type="button" data-action="grid-cols-plus" aria-label="Increase columns">
-                +
-              </button>
+              <button class="stepper__btn" type="button" data-action="grid-cols-plus" aria-label="Increase columns"></button>
               <span class="stepper__label">columns</span>
             </div>
           </div>

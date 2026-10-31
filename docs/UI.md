@@ -405,7 +405,9 @@ exceeds `state.playerCount`.
 - **Difficulty** segmented control: Easy / Medium / Hard. Saved immediately but
   currently UI-only; a `Bot · soon` badge makes the status explicit.
 - **Grid size** has one stepper per axis: rows and columns each 7–15, step 1,
-  with the minus/plus buttons disabled at the limits. The two values are shown
+  with the minus/plus buttons disabled at the limits. The plus/minus symbols are
+  drawn as centred CSS bars rather than font glyphs, so they sit exactly in the
+  middle of the circular buttons. The two values are shown
   as `<rows> × <columns>`, so boards such as 11×7 are possible. Applies on the
   next **New game**.
 - **Number of players** segmented control: 1 / 2 / 3 / 4. Applies on the next

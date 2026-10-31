@@ -817,6 +817,9 @@ p {
 }
 
 .stepper__btn {
+  position: relative;
+  display: grid;
+  place-items: center;
   flex: none;
   width: 44px;
   height: 44px;
@@ -832,6 +835,30 @@ p {
   cursor: pointer;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Draw the symbols as centred bars instead of font glyphs: glyph metrics sit
+   a few pixels below the optical centre of the circle. */
+.stepper__btn::before,
+.stepper__btn::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 12px;
+  height: 2px;
+  border-radius: 1px;
+  background: currentColor;
+  transform: translate(-50%, -50%);
+}
+
+.stepper__btn::after {
+  width: 2px;
+  height: 12px;
+}
+
+.stepper__btn[data-action$="-minus"]::after {
+  display: none;
 }
 
 .stepper__btn:disabled {
