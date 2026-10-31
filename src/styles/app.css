@@ -274,6 +274,7 @@ p {
 /* The match is a three-column flex row: optional side rails around the
    centre column that holds Player 2, the board, and Player 1. */
 .match {
+  --score-thickness: 40px;
   flex: 1;
   min-height: 0;
   display: flex;
@@ -307,15 +308,19 @@ p {
 
 /* Player 2 sits above the board, Player 1 below it. The bar cards carry no
    coloured left border in either the idle or the active state. */
+.score--bar {
+  min-height: var(--score-thickness);
+}
 
 /* Players 3 and 4 sit on the left and right in portrait, or read as
-   vertical side cards in the wide layout. */
+   vertical side cards in the wide layout. Their thickness matches the height
+   of the Player 1/2 bar cards. */
 .score--rail {
-  flex: 0 0 clamp(48px, 13vw, 108px);
+  flex: 0 0 var(--score-thickness);
   flex-direction: column;
   justify-content: center;
   gap: 8px;
-  padding: 12px 8px;
+  padding: 10px 3px;
   text-align: center;
 }
 
@@ -395,10 +400,14 @@ p {
 }
 
 .score--rail .score__stats {
-  flex-direction: column;
+  flex-direction: row;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 8px;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  white-space: nowrap;
   font-size: 10.5px;
   text-align: center;
 }
@@ -409,7 +418,6 @@ p {
 
 .score--rail.is-active .score__name::after {
   content: "turn";
-  writing-mode: horizontal-tb;
 }
 
 /* ---------- Board ---------- */
@@ -1066,11 +1074,6 @@ p {
 }
 
 @media (max-width: 520px) {
-  .score--rail {
-    flex-basis: 48px;
-    padding-inline: 4px;
-  }
-
   .score--rail .score__name {
     font-size: 11px;
   }
@@ -1124,8 +1127,8 @@ p {
     padding-block: 5px;
   }
 
-  .score--rail {
-    flex-basis: clamp(44px, 8vw, 76px);
+  .match {
+    --score-thickness: 32px;
   }
 
   .board {

@@ -102,10 +102,10 @@ With 3 players the right rail stays empty; with 2 players both rails are
 
 - **Player 2 is always above the board; Player 1 is always below it.**
 - **Player 3** is a vertical card in the left rail and **Player 4** in the right
-  rail. Their names use rotated vertical text (the whole label turned 90° and
-  read top-to-bottom), so `Player 3` stays compact in a narrow rail on a phone.
-  The rails exist in the DOM at all times but are `hidden` unless
-  `playerCount` is 3 or 4.
+  rail. Their names and the cells/orbs counters use rotated vertical text (the
+  whole label turned 90° and read top-to-bottom), so they stay compact in a
+  narrow rail on a phone. The rails exist in the DOM at all times but are
+  `hidden` unless `playerCount` is 3 or 4.
 - The panels belong to the players, not to the current turn.
 - The game bar holds the menu button, the live turn status, and a matching
   spacer for symmetry. The status is **plain text**: no card, background,
@@ -334,9 +334,12 @@ exceeds `state.playerCount`.
   **orbs owned**.
 - The bar cards carry no coloured left border in the idle or active state; a
   name dot in the player colour identifies the owner.
-- The rail cards have no coloured top border; their player name is set in
-  rotated vertical text (`writing-mode: vertical-rl`, `text-orientation:
-  mixed`), so the label reads sideways from top to bottom.
+- The rail cards have no coloured top border; their player name and the
+  cells/orbs counters are set in rotated vertical text (`writing-mode:
+  vertical-rl`, `text-orientation: mixed`), so each line reads sideways from
+  top to bottom.
+- A rail card is exactly as thick as a P1/P2 bar card is tall
+  (`--score-thickness`, 40 px by default), so all four cards share one thickness.
 - The active player's card gets a soft tint, a 2 px coloured ring, and a
   "playing" pill (bar cards) or "turn" pill (rail cards). The turn is signalled
   by text, colour, position, and the bar — not colour alone.
@@ -499,9 +502,10 @@ never show an orb the model does not contain (the legacy "ghost coin" bug).
   manages its own scrolling. The rules, settings, and about screens scroll their
   content, and the home screen scrolls on very short viewports.
 - Board width is bounded by the centre column, viewport height, and a 560 px cap.
-- In four-player mode the side rails take `clamp(48px, 13vw, 108px)` each; below
-  520 px they collapse to 48 px with smaller type.
-- Player cards stretch to the full row; stats wrap on very narrow screens.
+- In four-player mode the side rails are `--score-thickness` wide (40 px by
+  default, 32 px in short landscape), matching the height of the P1/P2 bar
+  cards; below 520 px they keep that thickness with smaller type.
+- Player cards stretch to the full row; bar stats wrap on very narrow screens.
 - Short landscape (`max-height: 560px`) shrinks the game bar, icon buttons,
   score padding, board, and side rails, hides the home description, and lays
   the home actions out in a row.
