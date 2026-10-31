@@ -312,7 +312,7 @@ type GameEvent =
   | { type: "add"; at: CellRef; player: Player; orbs: number }
   | { type: "explode"; at: CellRef; player: Player; orbs: number }
   | { type: "transfer"; from: CellRef; to: CellRef; player: Player;
-      captured: boolean; orbs: number }
+      captured: boolean; capturedFrom: Player | null; orbs: number }
   | { type: "cascade-limit"; reason: "limit" }
   | { type: "win"; winner: Player | null };
 ```

@@ -1,5 +1,5 @@
 import { capacityAt, getCell, neighbors, setCell } from "./board.js";
-import type { CellRef, GameEvent, GameState } from "./types.js";
+import type { CellRef, GameEvent, GameState, Player } from "./types.js";
 
 /**
  * Safety cap for a single cascade. Real games resolve in a few hundred
@@ -44,11 +44,13 @@ export function resolveCascades(
     for (const target of neighbors(state.rows, state.cols, ref.row, ref.col)) {
       const existing = getCell(state.board, target.row, target.col);
       let captured = false;
+      let capturedFrom: Player | null = null;
 
       if (existing === null) {
         setCell(state.board, target.row, target.col, { owner, orbs: 1 });
       } else {
         captured = existing.owner !== owner;
+        if (captured) capturedFrom = existing.owner;
         existing.owner = owner;
         existing.orbs += 1;
       }
@@ -60,6 +62,7 @@ export function resolveCascades(
         to: { ...target },
         player: owner,
         captured,
+        capturedFrom,
         orbs: updated === null ? 1 : updated.orbs,
       });
 

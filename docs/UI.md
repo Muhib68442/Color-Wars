@@ -471,8 +471,9 @@ Behaviour:
 | Legal target | Pointer cursor, hover ring, press scale |
 | Illegal target | No pointer, `aria-disabled="true"` |
 | Active player | Card tint + ring + "playing" pill, coloured plain-text status |
-| Explosion | Source cell cleared; surrounding cells flash via Web Animations |
-| Transfer / capture | Destination cell brightness flash, orb pop |
+| Explosion | Source cell flashes and a coloured ring expands; orbs hop out |
+| Transfer | Orb clone arcs to the target; the new orb pops in under a landing ring |
+| Capture | Target keeps the old owner colour while the orb flies, then takes the new colour |
 | Win | Status text + modal dialog; board locked |
 | Solo mode | One score card, status reads `Player N · solo practice`, never ends |
 | Saved game | Restored on launch behind the home screen |
@@ -506,8 +507,19 @@ never show an orb the model does not contain (the legacy "ghost coin" bug).
 - **Sound:** place, explosion, win, and reject cues through the Web Audio API;
   suppressed while the Sound setting is off.
 - **Animations:** place, add, explode, and transfer events are replayed as short
-  Web Animations effects. They are skipped entirely when
-  `prefers-reduced-motion: reduce` is set.
+  Web Animations effects.
+  - Each explosion flashes its source cell and emits an expanding ring in the
+    detonating player's colour.
+  - Every transfer launches an orb clone from the source to each neighbour on a
+    short curved hop (a sideways bulge plus an upward lift, so even orthogonal
+    moves read as diagonal jumps).
+  - The freshly added orb is hidden until the clone lands, then fades in.
+  - On capture, the destination cell holds its previous owner's colour for the
+    duration of the flight and then cross-fades to the new owner's colour, so
+    the colour visibly changes when the orb arrives.
+  - All effects are skipped entirely when `prefers-reduced-motion: reduce` is
+    set, and the board is still rendered from the final state, so animations can
+    never leave the DOM out of sync with the model.
 
 ---
 

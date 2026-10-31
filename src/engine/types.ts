@@ -41,6 +41,8 @@ export type GameEvent =
       to: CellRef;
       player: Player;
       captured: boolean;
+      /** Previous owner when the destination was captured, otherwise null. */
+      capturedFrom: Player | null;
       orbs: number;
     }
   | { type: "cascade-limit"; reason: "limit" }

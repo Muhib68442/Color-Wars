@@ -81,7 +81,11 @@ describe("capture and chains", () => {
         event.to.row === 0 &&
         event.to.col === 1,
     );
-    expect(transfer).toMatchObject({ captured: true, player: 1 });
+    expect(transfer).toMatchObject({
+      captured: true,
+      player: 1,
+      capturedFrom: 2,
+    });
     expect(result.state.gameOver).toBe(false);
   });
 

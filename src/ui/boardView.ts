@@ -25,6 +25,8 @@ export interface BoardView {
   readonly element: HTMLElement;
   render(state: GameState): void;
   elementFor(ref: CellRef): HTMLElement | null;
+  /** The configured colour for a player, used by the movement animations. */
+  playerColor(player: Player): string;
   focusCell(ref: CellRef): void;
   focusDefault(): void;
 }
@@ -301,6 +303,7 @@ export function createBoardView(
     element,
     render,
     elementFor: (ref) => cellAt(ref.row, ref.col)?.button ?? null,
+    playerColor: (player) => options.getProfiles()[player].color,
     focusCell,
     focusDefault,
   };

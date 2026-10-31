@@ -140,10 +140,11 @@ function resolveCascades(state, start):
             if state.board[n] is Empty:
                 state.board[n] = { owner: owner, orbs: 1 }
             else:
+                capturedFrom = state.board[n].owner   // null if same owner
                 state.board[n].owner = owner      // capture, even if enemy
                 state.board[n].orbs += 1
 
-            emit Transfer(cell → n, owner)
+            emit Transfer(cell → n, owner, capturedFrom)
 
             if state.board[n].orbs >= capacity(n):
                 queue.push(n)                     // may detonate later
