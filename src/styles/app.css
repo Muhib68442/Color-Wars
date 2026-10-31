@@ -416,9 +416,15 @@ p {
   font-size: 13px;
 }
 
+.score--rail .score__name::after {
+  writing-mode: horizontal-tb;
+  text-orientation: mixed;
+}
+
 /* ---------- Board ---------- */
 
 .stage {
+  container-type: size;
   display: grid;
   place-items: center;
   flex: 1;
@@ -428,11 +434,16 @@ p {
 
 .board {
   --gap: clamp(1px, 0.7vw, 6px);
-  /* Size from the shorter axis so rectangular boards stay fully visible:
-     height is bounded by 52vh and width follows the row/column ratio. */
+  /* Fill the stage: width follows the shorter available axis, so a tall 11×7
+     board uses the full height and a wide 7×11 board uses the full width. */
   width: min(
     100%,
     calc(52vh * var(--cols, 7) / var(--rows, 7)),
+    560px
+  );
+  width: min(
+    100cqw,
+    calc((100cqh - 2 * var(--gap)) * var(--cols, 7) / var(--rows, 7)),
     560px
   );
   display: grid;
@@ -1175,6 +1186,11 @@ p {
     width: min(
       100%,
       calc(62vh * var(--cols, 7) / var(--rows, 7)),
+      420px
+    );
+    width: min(
+      100cqw,
+      calc((100cqh - 2 * var(--gap)) * var(--cols, 7) / var(--rows, 7)),
       420px
     );
   }

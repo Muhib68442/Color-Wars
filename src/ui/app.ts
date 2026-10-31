@@ -294,19 +294,19 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
     }
 
     overlay.open({
-      eyebrow: "New game",
-      title: "Start over?",
+      eyebrow: "Restart match",
+      title: "Restart match?",
       body: "The current match and its save will be lost.",
       actions: [
         {
-          label: "Start over",
+          label: "No, keep playing",
           variant: "primary",
-          run: () => startNewMatch(),
+          run: () => overlay.close(),
         },
         {
-          label: "Keep playing",
+          label: "Yes, restart",
           variant: "secondary",
-          run: () => overlay.close(),
+          run: () => startNewMatch(),
         },
       ],
     });
@@ -322,7 +322,6 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
       actions: [
         {
           label: "How to play",
-          variant: "primary",
           run: () => {
             overlay.close();
             infoReturn = "game";
@@ -331,10 +330,7 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
         },
         {
           label: "Restart match",
-          run: () => {
-            overlay.close();
-            requestNewGame();
-          },
+          run: () => requestNewGame(),
         },
         {
           label: "Back to home",
@@ -345,6 +341,7 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
         },
         {
           label: "Keep playing",
+          variant: "primary",
           run: () => overlay.close(),
         },
       ],

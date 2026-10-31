@@ -345,7 +345,7 @@ exceeds `state.playerCount`.
 - The rail cards have no coloured top border; their player name and the
   cells/orbs counters are set in rotated vertical text (`writing-mode:
   vertical-rl`, `text-orientation: mixed`), so each line reads sideways from
-  top to bottom.
+  top to bottom. The "playing" pill is horizontal, exactly like the P1/P2 bars.
 - A rail card is exactly as thick as a P1/P2 bar card is tall
   (`--score-thickness`, 40 px by default), so all four cards share one thickness.
 - The active player's card gets a soft tint, a 2 px coloured ring, and a
@@ -358,9 +358,9 @@ exceeds `state.playerCount`.
 
 - CSS grid driven by `--cols` and `--rows`:
   `repeat(var(--cols, 7), minmax(0, 1fr))`; square cells size the rows.
-- Width: `min(100%, calc(52vh * var(--cols) / var(--rows)), 560px)`, so any
-  rectangle fits without scrolling and the board never exceeds the centre
-  column. An 11×7 board is taller than it is wide; a 7×11 board is wider.
+- The stage is a size container, so the board fills it: width is
+  `min(100cqw, (100cqh - 2 × gap) × cols / rows, 560px)`. Tall boards such as
+  11×7 use the full stage height; wide boards such as 7×11 use the full width.
 - The board is re-created when either grid axis changes. Each axis supports 7
   through 15 (11×7 = 77 cells, 15×15 = 225 cells).
 - White frame with rounded corners and a small shadow.
@@ -417,7 +417,8 @@ exceeds `state.playerCount`.
 - **Reset to defaults** restores the full default settings object and saves it.
 
 All settings are written to `color-wars:settings` as
-`{ version: 1, settings: GameSettings }` on every change.
+`{ version: 2, settings: GameSettings }` on every change. Version-1 blobs that
+stored a single square `gridSize` are migrated onto both axes on load.
 
 ### 5.8 How to play screen
 
@@ -440,10 +441,11 @@ Used for three things:
 
 1. **Result** — eyebrow "Game over", title `<name> wins` or `It's a draw`,
    explanation, and **Play again** (primary) / **Back to home**.
-2. **Restart confirmation** — title "Start over?", **Start over** /
-   **Keep playing**, shown only when a game is in progress.
-3. **Game menu** — title "Paused", the current turn, and **How to play**,
-   **Restart match**, **Back to home**, **Keep playing**.
+2. **Restart confirmation** — title "Restart match?", the warning that the
+   match and save will be lost, and **No, keep playing** (primary) /
+   **Yes, restart**. Shown when Restart match is chosen during a live game.
+3. **Game menu** — title "Paused", the current turn, **How to play**,
+   **Restart match**, **Back to home**, and **Keep playing** (primary).
 
 Behaviour:
 
@@ -513,7 +515,8 @@ never show an orb the model does not contain (the legacy "ghost coin" bug).
 - The app shell is exactly `100dvh` tall with `overflow: hidden`; each screen
   manages its own scrolling. The rules, settings, and about screens scroll their
   content, and the home screen scrolls on very short viewports.
-- Board width is bounded by the centre column, viewport height, and a 560 px cap.
+- The stage is a CSS size container; the board fills it while keeping square
+  cells, bounded by a 560 px cap.
 - In four-player mode the side rails are `--score-thickness` wide (40 px by
   default, 32 px in short landscape), matching the height of the P1/P2 bar
   cards; below 520 px they keep that thickness with smaller type.

@@ -277,10 +277,10 @@ server; it does not change the packaging model.
   ```
   `GameState` carries `playerCount` (1–4) and `hasPlayed` for all four seats.
 - Settings are stored separately under `color-wars:settings` as
-  `{ version: 1, settings: GameSettings }`.
-- On launch: validate the schema, check board shape, player count, owner range,
-  and stability. If anything is invalid — including a version-1 save — start a
-  new game instead of restoring a corrupt state.
+  `{ version: 2, settings: GameSettings }` (`gridRows` and `gridCols`).
+- On launch: validate the schema, check the row/column range, player count,
+  owner range, and stability. If anything is invalid — including a version-1
+  save — start a new game instead of restoring a corrupt state.
 - Use `@capacitor/preferences` on Android; `localStorage` on web. Keep the
   `KeyValueStore` adapter interface identical for both save and settings.
 - Test process death with Developer Options → **Don't keep activities**, and by
@@ -305,10 +305,11 @@ Test the gesture navigation and predictive back on Android 13+.
 
 - Prefer `unspecified` orientation with a responsive rectangular board:
   ```css
+  .stage { container-type: size; }
   .board {
     width: min(
-      100%,
-      calc(52vh * var(--cols, 7) / var(--rows, 7)),
+      100cqw,
+      calc((100cqh - 2 * var(--gap)) * var(--cols, 7) / var(--rows, 7)),
       560px
     );
     display: grid;
@@ -316,8 +317,8 @@ Test the gesture navigation and predictive back on Android 13+.
     gap: clamp(1px, 0.7vw, 6px);
   }
   ```
-  Cells are square (`aspect-ratio: 1`), so width follows the column/row ratio
-  and height stays within 52vh. This keeps 11×7 and 7×11 fully visible.
+  Cells are square (`aspect-ratio: 1`), so the board fills the stage: a tall
+  11×7 board uses the full height and a wide 7×11 board uses the full width.
 - Touch targets must stay at least **48 dp**; scale cells with the board. At
   15×15 on a narrow phone, cells fall below 48 dp, so add a zoom/inspect
   affordance or accept the smaller visual target with a larger hit area before

@@ -378,8 +378,12 @@ replaced them.
 
 ```
 Save     = { version: 2, savedAt: number, state: GameState }
-Settings = { version: 1, settings: GameSettings }
+Settings = { version: 2, settings: GameSettings }
 ```
+
+`GameSettings` stores `gridRows` and `gridCols` separately (each 7–15).
+Version-1 settings that used a single square `gridSize` are normalized onto both
+axes on load.
 
 `SAVE_VERSION = 2` covers the multi-player, variable-grid state shape
 (`playerCount`, `hasPlayed` for 1–4). Version-1 saves are rejected by

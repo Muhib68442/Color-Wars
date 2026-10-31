@@ -663,18 +663,28 @@ describe("game menu", () => {
     cellButton(root, 0, 0).click();
 
     button(root, "menu").click();
+    expect(
+      action(root, "Keep playing").classList.contains("btn--primary"),
+    ).toBe(true);
+    expect(
+      action(root, "Restart match").classList.contains("btn--secondary"),
+    ).toBe(true);
+
     action(root, "Restart match").click();
 
     expect(overlay(root).hasAttribute("open")).toBe(true);
-    expect(overlayTitle(root)).toBe("Start over?");
+    expect(overlayTitle(root)).toBe("Restart match?");
+    expect(
+      action(root, "No, keep playing").classList.contains("btn--primary"),
+    ).toBe(true);
 
-    action(root, "Keep playing").click();
+    action(root, "No, keep playing").click();
     expect(overlay(root).hasAttribute("open")).toBe(false);
     expect(app.getState().moveCount).toBe(1);
 
     button(root, "menu").click();
     action(root, "Restart match").click();
-    action(root, "Start over").click();
+    action(root, "Yes, restart").click();
 
     expect(app.getState().moveCount).toBe(0);
     expect(orbsOn(root, 0, 0)).toBe(0);
