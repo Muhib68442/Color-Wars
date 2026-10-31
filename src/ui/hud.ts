@@ -4,7 +4,7 @@ import {
   type GameState,
   type Player,
 } from "../engine/index.js";
-import type { PlayerProfile } from "../platform/settings.js";
+import type { PlayerProfile, Theme } from "../platform/settings.js";
 import { softenColor } from "../platform/settings.js";
 import type { ScoreCard } from "./shell.js";
 
@@ -14,6 +14,7 @@ export interface HudRefs {
   status: HTMLElement;
   scores: Record<Player, ScoreCard>;
   getProfiles: () => Record<Player, PlayerProfile>;
+  getTheme: () => Theme;
 }
 
 export interface Hud {
@@ -31,6 +32,7 @@ export function createHud(refs: HudRefs): Hud {
   return {
     render(state) {
       const profiles = refs.getProfiles();
+      const dark = refs.getTheme() === "dark";
       const active = state.gameOver ? null : state.currentPlayer;
 
       for (const player of PLAYERS) {
@@ -46,7 +48,12 @@ export function createHud(refs: HudRefs): Hud {
         score.root.style.setProperty("--pc", profiles[player].color);
         score.root.style.setProperty(
           "--pc-soft",
-          softenColor(profiles[player].color),
+          softenColor(
+            profiles[player].color,
+            dark ? 0.82 : 0.84,
+            dark ? 32 : 255,
+            dark ? "#1f232c" : "#f3f3f6",
+          ),
         );
         score.root.classList.toggle("is-active", active === player);
         score.root.dataset.active = active === player ? "true" : "false";

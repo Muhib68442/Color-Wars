@@ -9,10 +9,11 @@ import {
 import { isRecord, type KeyValueStore } from "./storage.js";
 
 export const SETTINGS_KEY = "color-wars:settings";
-export const SETTINGS_VERSION = 2;
+export const SETTINGS_VERSION = 3;
 export const MAX_NAME_LENGTH = 16;
 
 export type Difficulty = "easy" | "medium" | "hard";
+export type Theme = "light" | "dark";
 
 export interface PlayerProfile {
   name: string;
@@ -21,6 +22,7 @@ export interface PlayerProfile {
 
 export interface GameSettings {
   difficulty: Difficulty;
+  theme: Theme;
   gridRows: number;
   gridCols: number;
   playerCount: PlayerCount;
@@ -42,11 +44,13 @@ const DEFAULT_PROFILES: Record<Player, PlayerProfile> = {
 };
 
 const DIFFICULTIES: Difficulty[] = ["easy", "medium", "hard"];
+const THEMES: Theme[] = ["light", "dark"];
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 
 export function defaultSettings(): GameSettings {
   return {
     difficulty: "medium",
+    theme: "light",
     gridRows: MIN_GRID_SIZE,
     gridCols: MIN_GRID_SIZE,
     playerCount: 2,
@@ -73,6 +77,10 @@ export function isDifficulty(value: unknown): value is Difficulty {
     typeof value === "string" &&
     (DIFFICULTIES as string[]).includes(value)
   );
+}
+
+export function isTheme(value: unknown): value is Theme {
+  return typeof value === "string" && (THEMES as string[]).includes(value);
 }
 
 export function isHexColor(value: unknown): value is string {
@@ -126,6 +134,7 @@ export function normalizeSettings(value: unknown): GameSettings {
     difficulty: isDifficulty(value["difficulty"])
       ? value["difficulty"]
       : defaults.difficulty,
+    theme: isTheme(value["theme"]) ? value["theme"] : defaults.theme,
     gridRows: clampInt(
       value["gridRows"],
       MIN_GRID_SIZE,
@@ -148,14 +157,30 @@ export function normalizeSettings(value: unknown): GameSettings {
   };
 }
 
-/** Blends a hex colour with white for active cards and soft accents. */
-export function softenColor(hex: string, amount = 0.84): string {
-  return mixColor(hex, 255, amount, "#f3f3f6");
+/**
+ * Blends a hex colour with a light (default) or dark target for active cards
+ * and soft accents.
+ */
+export function softenColor(
+  hex: string,
+  amount = 0.84,
+  target = 255,
+  fallback = "#f3f3f6",
+): string {
+  return mixColor(hex, target, amount, fallback);
 }
 
-/** Blends a hex colour with black for borders and status text. */
-export function strengthenColor(hex: string, amount = 0.22): string {
-  return mixColor(hex, 0, amount, "#14161a");
+/**
+ * Blends a hex colour toward black (default) or white for borders and status
+ * text.
+ */
+export function strengthenColor(
+  hex: string,
+  amount = 0.22,
+  target = 0,
+  fallback = "#14161a",
+): string {
+  return mixColor(hex, target, amount, fallback);
 }
 
 function mixColor(

@@ -326,8 +326,9 @@ type GameEvent =
   **about**), the compact turn status, up to four score cards, dialogs, and
   input locking.
 - Apply player names and colours from settings to the score cards, board
-  labels, and palette tokens; grid rows/columns and player count take effect on
-  the next **New game**.
+  labels, and palette tokens; apply the light/dark theme to `<html>` and
+  regenerate the palette for that theme; grid rows/columns and player count take
+  effect on the next **New game**.
 - Contain **no rule logic** (no capacity checks, no winner checks).
 
 #### Platform contract
@@ -378,12 +379,14 @@ replaced them.
 
 ```
 Save     = { version: 2, savedAt: number, state: GameState }
-Settings = { version: 2, settings: GameSettings }
+Settings = { version: 3, settings: GameSettings }
 ```
 
-`GameSettings` stores `gridRows` and `gridCols` separately (each 7–15).
-Version-1 settings that used a single square `gridSize` are normalized onto both
-axes on load.
+`GameSettings` stores `theme` (`light` or `dark`), `gridRows` and `gridCols`
+separately (each 7–15). Version-1 settings that used a single square `gridSize`
+are normalized onto both axes on load; settings without a valid theme (v1/v2)
+default to light. The theme is applied to `<html data-theme="…">`, and a small
+inline script in `index.html` reads the saved value before first paint.
 
 `SAVE_VERSION = 2` covers the multi-player, variable-grid state shape
 (`playerCount`, `hasPlayed` for 1–4). Version-1 saves are rejected by
@@ -415,15 +418,16 @@ Studio 2025.2.1+, fully offline assets, no runtime permissions required.
   counts).
 - **Animation:** consume engine events with a tween queue instead of redrawing
   instantly.
-- **Themes:** the `--pN` / `--pN-soft` / `--pN-strong` tokens are already
-  runtime-overridable from settings.
+- **Themes:** done — light and dark token sets are selected by
+  `<html data-theme>`, while the `--pN` / `--pN-soft` / `--pN-strong` tokens are
+  regenerated for the active theme from settings.
 
 ---
 
 ## 6. Testing strategy
 
 The engine is tested with **Vitest** (`npm test`), independently of the DOM and
-of Capacitor. The suite currently has **87 tests across 8 files**.
+of Capacitor. The suite currently has **93 tests across 8 files**.
 
 1. **Board and capacity** (`tests/engine/board.test.ts`)
    - corners 2, edges 3, interior 4;
@@ -458,13 +462,13 @@ of Capacitor. The suite currently has **87 tests across 8 files**.
 6. **Storage and settings** (`tests/platform/`)
    - save round-trip, corrupt-save rejection, v1 rejection, four-player 15×15
      round-trip, unstable-board refusal;
-   - settings defaults, clamping, name/colour sanitisation, colour blending,
-     persistence, and corrupt-data fallback.
+   - settings defaults, clamping, theme validation and migration, name/colour
+     sanitisation, colour blending, persistence, and corrupt-data fallback.
 7. **UI tests** (`tests/ui/app.test.ts`, jsdom)
    - the home screen gates the match and all five actions exist;
    - **New game** clears the save, **Resume** restores an unfinished match;
-   - settings change grid/player count/names/colours/sound/vibration and
-     persist across a reload;
+   - settings change theme/grid/player count/names/colours/sound/vibration and
+     persist across a reload; the theme applies to the document root;
    - four-player layout order (`3`, `2`, `board`, `1`, `4`) and hidden rails;
    - placing, capturing, focus movement, win overlay, and input locking;
    - solo status.

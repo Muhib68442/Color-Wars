@@ -16,6 +16,7 @@ export interface PlayerRowRefs {
 
 export interface SettingsRefs {
   difficultyButtons: HTMLButtonElement[];
+  themeButtons: HTMLButtonElement[];
   playerCountButtons: HTMLButtonElement[];
   gridRowsValue: HTMLElement;
   gridRowsMinus: HTMLButtonElement;
@@ -263,6 +264,21 @@ const SHELL_TEMPLATE = /* html */ `
     </header>
 
     <div class="settings">
+      <section class="panel" aria-labelledby="settings-appearance">
+        <h3 class="panel__title" id="settings-appearance">Appearance</h3>
+
+        <div class="field">
+          <span class="field__label">Theme</span>
+          <div class="segmented" data-role="theme" role="group" aria-label="Theme">
+            <button type="button" data-theme-option="light" aria-pressed="false">Light</button>
+            <button type="button" data-theme-option="dark" aria-pressed="false">Dark</button>
+          </div>
+          <p class="field__hint">
+            Applies to every screen and is saved on this device.
+          </p>
+        </div>
+      </section>
+
       <section class="panel" aria-labelledby="settings-match">
         <h3 class="panel__title" id="settings-match">Match</h3>
 
@@ -501,6 +517,9 @@ export function mountShell(root: HTMLElement): Shell {
     settingsRefs: {
       difficultyButtons: Array.from(
         root.querySelectorAll<HTMLButtonElement>("[data-difficulty]"),
+      ),
+      themeButtons: Array.from(
+        root.querySelectorAll<HTMLButtonElement>("[data-theme-option]"),
       ),
       playerCountButtons: Array.from(
         root.querySelectorAll<HTMLButtonElement>("[data-count]"),

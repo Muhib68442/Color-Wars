@@ -18,7 +18,7 @@ dialog. Only one screen is visible at a time (`hidden` attribute).
 | --- | --- | --- |
 | **Home** | Branding and the five top-level actions | Launch, Back to home |
 | **Match** | The board, one score card per active player, and turn status | **Resume**, **New game** |
-| **Settings** | Grid, player count, names, colours, sound, vibration, difficulty | Home **Settings** |
+| **Settings** | Theme, grid, player count, names, colours, sound, vibration, difficulty | Home **Settings** |
 | **How to play** | Rules, controls, and tips | Home **How to play**, in-match menu |
 | **About** | Version, privacy, and credits | Home **About** |
 | **Dialog** | Result, restart confirmation, game menu | Game events, menu button |
@@ -119,13 +119,15 @@ With 3 players the right rail stays empty; with 2 players both rails are
 A header bar with a back button and the title, followed by a scrollable column
 of cards:
 
-1. **Match** — difficulty segmented control (with a “Bot · soon” badge), grid
+1. **Appearance** — Light / Dark theme segmented control. Applies immediately to
+   every screen and is saved.
+2. **Match** — difficulty segmented control (with a “Bot · soon” badge), grid
    stepper.
-2. **Players** — player-count segmented control (1–4) and one row per player
+3. **Players** — player-count segmented control (1–4) and one row per player
    with a colour swatch and a name field. Rows above the selected count are
    hidden.
-3. **Feedback** — Sound and Vibration switches.
-4. **Reset to defaults** — a quiet button below the cards.
+4. **Feedback** — Sound and Vibration switches.
+5. **Reset to defaults** — a quiet button below the cards.
 
 ### 2.5 How to play
 
@@ -189,6 +191,9 @@ body
     │   │   ├── h2.infobar__title#settings-title              "Settings"
     │   │   └── span.gamebar__spacer
     │   └── div.settings
+    │       ├── section.panel                        Appearance
+    │       │   └── div.segmented[data-role="theme"]
+    │       │       └── button[data-theme-option="light|dark"]
     │       ├── section.panel                        Match
     │       │   ├── div.segmented[data-role="difficulty"]
     │       │   │   └── button[data-difficulty="easy|medium|hard"]
@@ -243,8 +248,8 @@ already a focusable button; this avoids a broken grid/gridcell hierarchy. Its
 `aria-label` is updated to the active size, e.g. `Board, 9 by 9`.
 
 Score cards carry `aria-label="<name> score"`, refreshed from the player's
-custom name. The settings screen uses `aria-pressed` on both segmented controls
-and `aria-live="polite"` on the grid value.
+custom name. The settings screen uses `aria-pressed` on all three segmented
+controls and `aria-live="polite"` on the grid value.
 
 ---
 
@@ -257,6 +262,7 @@ Defined in `src/styles/tokens.css`.
 | `--bg` | `#e6e6ea` | Page background |
 | `--surface` | `#ffffff` | Cards, board frame, dialog |
 | `--surface-sunken` | `#f3f3f6` | Secondary buttons, player rows, segments |
+| `--surface-hover` | `#e9e9ee` | Secondary button hover |
 | `--nav` | `#333333` | Theme colour / Android system bar |
 | `--ink` | `#14161a` | Primary text |
 | `--ink-muted` | `#5b5f69` | Secondary text, hints, home note |
@@ -274,10 +280,47 @@ Defined in `src/styles/tokens.css`.
 | `--p4-strong` | `#b8740f` | Player 4 border and status text |
 | `--p4-soft` | `#fdf2df` | Active Player 4 card |
 | `--accent` | `#1176ff` | Focus rings, primary button |
+| `--accent-ink` | `#ffffff` | Primary button text |
+| `--accent-hover` | `#0a63d8` | Primary button hover |
 | `--cell-empty` | `#efeff3` | Empty cell fill |
+| `--cell-empty-line` | `#d8d8de` | Empty cell border |
+| `--cell-hover` | `#f7f7fa` | Legal empty cell hover |
+| `--cell-hover-line` | `#9a9aa6` | Legal cell hover border |
+| `--cell-hover-ring` | `rgb(20 22 26 / 35%)` | Empty cell hover ring |
+| `--hover` | `rgb(20 22 26 / 6%)` | Quiet button and icon hover |
+| `--badge-bg` | `rgb(255 255 255 / 70%)` | “playing” pill |
+| `--switch-track` | `#d4d5db` | Off switch track |
+| `--backdrop` | `rgb(20 22 26 / 48%)` | Dialog backdrop |
 | `--font-display` | `CustomFont`, Segoe UI | Title, player names, dialog title |
 | `--font-body` | system UI stack | Everything else |
 | `--safe-*` | `env(safe-area-inset-*)` | Android edge-to-edge padding |
+
+### Themes
+
+The light palette is the default on `:root`. Dark mode is a second token set
+under `:root[data-theme="dark"]`; `color-scheme` switches with it so native
+controls, scrollbars, and form widgets match. The theme is applied to
+`<html>` and therefore covers every screen, the board, dialogs, rails, and
+movement effects.
+
+| Token | Light | Dark |
+| --- | --- | --- |
+| `--bg` | `#e6e6ea` | `#0f1115` |
+| `--surface` | `#ffffff` | `#191d24` |
+| `--surface-sunken` | `#f3f3f6` | `#222731` |
+| `--surface-hover` | `#e9e9ee` | `#262c36` |
+| `--ink` | `#14161a` | `#f1f4f9` |
+| `--ink-muted` | `#5b5f69` | `#a7aebc` |
+| `--line` | `#cfd0d6` | `#313845` |
+| `--cell-empty` | `#efeff3` | `#20252e` |
+| `--cell-empty-line` | `#d8d8de` | `#333a46` |
+| `--accent` | `#1176ff` | `#4d9dff` |
+| `--accent-ink` | `#ffffff` | `#06101f` |
+| `--accent-hover` | `#0a63d8` | `#6fb1ff` |
+| `--backdrop` | `rgb(20 22 26 / 48%)` | `rgb(0 0 0 / 62%)` |
+
+The saved theme is also applied by a small inline script in `index.html` before
+the first paint, so a dark-theme launch never flashes the light palette.
 
 ### Custom player colours
 
@@ -286,13 +329,17 @@ settings:
 
 ```
 --pN         the chosen hex
---pN-strong  chosen colour strengthened 22 % toward black
---pN-soft    chosen colour softened 84 % toward white
+--pN-strong  chosen colour strengthened 22 % toward black (light)
+             or 40 % toward white (dark)
+--pN-soft    chosen colour softened 84 % toward white (light)
+             or 82 % toward near-black (dark)
 ```
 
-`strengthenColor` and `softenColor` live in `platform/settings.ts`. The board
+`strengthenColor` and `softenColor` live in `platform/settings.ts` and accept
+the mix target and fallback, so the same helpers serve both themes. The board
 also sets per-cell `--pc`, `--pc-strong`, `--orb-ink`, and `--orb-alt` so that
-orb ink stays readable on any chosen colour.
+orb ink stays readable on any chosen colour; orb ink is derived from the player
+colour rather than the page theme.
 
 `font.ttf` is bundled with `@font-face` and `font-display: swap`. There is no
 remote font request, so the app works offline.
@@ -402,6 +449,10 @@ exceeds `state.playerCount`.
 
 ### 5.7 Settings screen
 
+- **Theme** segmented control: Light / Dark. Changing it applies to
+  `<html data-theme="…">` immediately across every screen, regenerates the
+  theme-aware player palette, and saves the choice. The same value is applied on
+  startup, and an inline head script reads the saved value before first paint.
 - **Difficulty** segmented control: Easy / Medium / Hard. Saved immediately but
   currently UI-only; a `Bot · soon` badge makes the status explicit.
 - **Grid size** has one stepper per axis: rows and columns each 7–15, step 1,
@@ -420,8 +471,9 @@ exceeds `state.playerCount`.
 - **Reset to defaults** restores the full default settings object and saves it.
 
 All settings are written to `color-wars:settings` as
-`{ version: 2, settings: GameSettings }` on every change. Version-1 blobs that
-stored a single square `gridSize` are migrated onto both axes on load.
+`{ version: 3, settings: GameSettings }` on every change. Version-1 blobs that
+stored a single square `gridSize` are migrated onto both axes on load, and
+version-1/2 blobs without a theme default to light.
 
 ### 5.8 How to play screen
 
@@ -465,6 +517,7 @@ Behaviour:
 
 | State | Representation |
 | --- | --- |
+| Theme | `data-theme` on `<html>`; light and dark token sets across all screens |
 | Home, no save | Logo, title, **New game** + links (no **Resume**), `New game · …` note |
 | Home, saved match | **Resume** and **New game**, saved-match note |
 | Home, finished match | **New game** + links (no **Resume**), last-result note |
@@ -496,8 +549,8 @@ never show an orb the model does not contain (the legacy "ghost coin" bug).
 - **Home:** **Resume** opens the saved match; **New game** discards any save
   and starts fresh from the current settings.
 - **Settings:** segmented buttons and the stepper update the saved settings
-  immediately; player rows update names/colours live; switches gate sound and
-  vibration.
+  immediately; the theme control repaints the whole app; player rows update
+  names/colours live; switches gate sound and vibration.
 - **Menu:** **How to play** opens the rules; **Restart match** asks for
   confirmation before clearing the board; **Back to home** keeps the save.
 - **Illegal actions** (enemy cell, out of bounds, after game over, while a
@@ -541,8 +594,9 @@ never show an orb the model does not contain (the legacy "ghost coin" bug).
   the home actions out in a row.
 - `viewport-fit=cover` plus `env(safe-area-inset-*)` padding keeps the UI clear
   of notches, gesture bars, and Android 15/16 system bars.
-- No dark mode: `color-scheme: light` and `android:forceDarkAllowed=false` in the
-  Android shell prevent WebView auto-dark from inverting the board.
+- Light and dark are real, user-selected themes. `color-scheme` follows the
+  selected theme, and `android:forceDarkAllowed=false` in the Android shell stops
+  WebView auto-dark from inverting the board on top of the dark palette.
 - Text uses `clamp()` and the system font stack, so Android font-size and
   display-size settings scale it.
 
@@ -571,7 +625,8 @@ never show an orb the model does not contain (the legacy "ghost coin" bug).
   lands on **Resume** when it is shown, otherwise **New game**.
 
 Not yet covered: a dedicated high-contrast theme and TalkBack-specific testing
-on a physical device (Phase 3).
+on a physical device (Phase 3). The light and dark themes are both fully
+navigable and keep the focus rings, text contrast, and non-colour orb patterns.
 
 ---
 
@@ -583,7 +638,7 @@ on a physical device (Phase 3).
   `src/platform/backButton.ts`.
 - Preferences will replace `localStorage` behind the same `KeyValueStore`
   interface, so the UI code does not change. Save version 2 and settings
-  version 1 are the payloads to migrate.
+  versions 1–3 are the payloads to migrate.
 - Haptics will use `@capacitor/haptics` behind the existing `Haptics`
   interface.
 - Sound uses the Web Audio API today; native audio can replace it behind the

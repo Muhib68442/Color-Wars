@@ -165,6 +165,17 @@ function playerColorInput(
   return input;
 }
 
+function themeButton(
+  root: HTMLElement,
+  theme: "light" | "dark",
+): HTMLButtonElement {
+  const element = settingsRoot(root).querySelector<HTMLButtonElement>(
+    `[data-theme-option="${theme}"]`,
+  );
+  if (element === null) throw new Error(`Missing theme option: ${theme}`);
+  return element;
+}
+
 function countButton(root: HTMLElement, count: number): HTMLButtonElement {
   const element = settingsRoot(root).querySelector<HTMLButtonElement>(
     `[data-count="${count}"]`,
@@ -283,6 +294,52 @@ describe("settings", () => {
 
     button(root, "settings-back").click();
     expect(app.getScreen()).toBe("home");
+  });
+
+  it("switches theme, applies it to every screen, and persists it", () => {
+    const store = memoryStore();
+    const first = mount({ store });
+
+    button(first.root, "settings").click();
+    expect(themeButton(first.root, "light").getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+    expect(themeButton(first.root, "dark").getAttribute("aria-pressed")).toBe(
+      "false",
+    );
+    expect(document.documentElement.dataset.theme).toBe("light");
+
+    themeButton(first.root, "dark").click();
+
+    expect(first.app.getSettings().theme).toBe("dark");
+    expect(themeButton(first.root, "dark").getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+    expect(themeButton(first.root, "light").getAttribute("aria-pressed")).toBe(
+      "false",
+    );
+    expect(document.documentElement.dataset.theme).toBe("dark");
+    expect(first.settingsStore.load().theme).toBe("dark");
+    expect(first.root.style.getPropertyValue("--p1-soft")).not.toBe("");
+
+    button(first.root, "settings-back").click();
+    expect(document.documentElement.dataset.theme).toBe("dark");
+
+    const second = mount({ store });
+    expect(second.app.getSettings().theme).toBe("dark");
+    expect(document.documentElement.dataset.theme).toBe("dark");
+
+    button(second.root, "settings").click();
+    expect(themeButton(second.root, "dark").getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+
+    button(second.root, "reset-settings").click();
+    expect(second.app.getSettings().theme).toBe("light");
+    expect(document.documentElement.dataset.theme).toBe("light");
+    expect(themeButton(second.root, "light").getAttribute("aria-pressed")).toBe(
+      "true",
+    );
   });
 
   it("steps rows and columns independently and recreates the board", () => {

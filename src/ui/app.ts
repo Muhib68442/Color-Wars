@@ -72,6 +72,7 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
     status: shell.status,
     scores: shell.scores,
     getProfiles: profiles,
+    getTheme: () => settings.theme,
   });
 
   const overlay = createOverlay(shell.overlay, () => {
@@ -82,12 +83,32 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
     return settings.profiles[player].name.trim() || `Player ${player}`;
   }
 
+  function applyTheme(): void {
+    const dark = settings.theme === "dark";
+    document.documentElement.dataset.theme = settings.theme;
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute("content", dark ? "#0f1115" : "#333333");
+  }
+
   function applyPalette(): void {
+    const dark = settings.theme === "dark";
+    const softTarget = dark ? 32 : 255;
+    const softFallback = dark ? "#1f232c" : "#f3f3f6";
+    const strongTarget = dark ? 255 : 0;
+    const strongFallback = dark ? "#f1f4f9" : "#14161a";
+
     for (const player of PLAYERS) {
       const color = settings.profiles[player].color;
       root.style.setProperty(`--p${player}`, color);
-      root.style.setProperty(`--p${player}-strong`, strengthenColor(color));
-      root.style.setProperty(`--p${player}-soft`, softenColor(color));
+      root.style.setProperty(
+        `--p${player}-strong`,
+        strengthenColor(color, dark ? 0.4 : 0.22, strongTarget, strongFallback),
+      );
+      root.style.setProperty(
+        `--p${player}-soft`,
+        softenColor(color, dark ? 0.82 : 0.84, softTarget, softFallback),
+      );
     }
   }
 
@@ -161,6 +182,12 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
 
     for (const button of refs.difficultyButtons) {
       const active = button.dataset.difficulty === settings.difficulty;
+      button.classList.toggle("is-selected", active);
+      button.setAttribute("aria-pressed", active ? "true" : "false");
+    }
+
+    for (const button of refs.themeButtons) {
+      const active = button.dataset.themeOption === settings.theme;
       button.classList.toggle("is-selected", active);
       button.setAttribute("aria-pressed", active ? "true" : "false");
     }
@@ -400,6 +427,20 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
     });
   }
 
+  for (const button of shell.settingsRefs.themeButtons) {
+    button.addEventListener("click", () => {
+      const value = button.dataset.themeOption;
+      if (value !== "light" && value !== "dark") return;
+      if (settings.theme === value) return;
+      settings.theme = value;
+      applyTheme();
+      applyPalette();
+      saveSettings();
+      populateSettings();
+      render();
+    });
+  }
+
   for (const button of shell.settingsRefs.playerCountButtons) {
     button.addEventListener("click", () => {
       const value = Number(button.dataset.count);
@@ -463,12 +504,14 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
 
   shell.settingsRefs.reset.addEventListener("click", () => {
     settings = defaultSettings();
+    applyTheme();
     saveSettings();
     applyPalette();
     populateSettings();
     render();
   });
 
+  applyTheme();
   applyPalette();
   render();
   showScreen("home");

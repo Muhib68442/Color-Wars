@@ -14,10 +14,11 @@ import {
 import { memoryStore } from "../../src/platform/storage.js";
 
 describe("settings defaults", () => {
-  it("starts at medium, 7x7, two players, sound and vibration on", () => {
+  it("starts light at medium, 7x7, two players, sound and vibration on", () => {
     const settings = defaultSettings();
 
     expect(settings.difficulty).toBe("medium");
+    expect(settings.theme).toBe("light");
     expect(settings.gridRows).toBe(7);
     expect(settings.gridCols).toBe(7);
     expect(settings.playerCount).toBe(2);
@@ -51,6 +52,14 @@ describe("normalizeSettings", () => {
 
     expect(settings.gridRows).toBe(12);
     expect(settings.gridCols).toBe(12);
+    expect(settings.theme).toBe("light");
+  });
+
+  it("keeps a valid theme and rejects unknown values", () => {
+    expect(normalizeSettings({ theme: "dark" }).theme).toBe("dark");
+    expect(normalizeSettings({ theme: "light" }).theme).toBe("light");
+    expect(normalizeSettings({ theme: "sepia" }).theme).toBe("light");
+    expect(normalizeSettings({}).theme).toBe("light");
   });
 
   it("rejects unknown difficulties and invalid colours", () => {
@@ -103,6 +112,12 @@ describe("names and colours", () => {
     expect(strong).toMatch(/^rgb\(/);
     expect(softenColor("nope")).toBe("#f3f3f6");
     expect(strengthenColor("nope")).toBe("#14161a");
+    expect(softenColor("#ffffff", 0.84, 32)).not.toBe(
+      softenColor("#ffffff"),
+    );
+    expect(strengthenColor("#000000", 0.22, 255)).toBe("rgb(56 56 56)");
+    expect(softenColor("nope", 0.84, 32, "#1f232c")).toBe("#1f232c");
+    expect(strengthenColor("nope", 0.22, 255, "#f1f4f9")).toBe("#f1f4f9");
   });
 
   it("picks readable ink and its opposite", () => {

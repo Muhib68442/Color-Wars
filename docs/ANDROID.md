@@ -117,7 +117,7 @@ const config: CapacitorConfig = {
     androidScheme: "https",
   },
   android: {
-    backgroundColor: "#e2e2e2",
+    backgroundColor: "#0f1115",
     allowMixedContent: false,
   },
 };
@@ -127,6 +127,9 @@ export default config;
 
 `androidScheme: "https"` is Capacitor's default; keep it. Do not enable mixed
 content. The package ID must be unique and must never change after publishing.
+The native background is dark so a dark-theme launch does not flash; the inline
+theme script in `index.html` sets the page palette before first paint, and the
+app repaints to light immediately when the saved theme is light.
 
 ### 4.2 `vite.config.ts`
 
@@ -157,12 +160,14 @@ worker: the assets are already local, and a stale SW cache is a common cause of
 <meta name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#333333" />
-<meta name="color-scheme" content="light" />
+<meta name="color-scheme" content="light dark" />
 ```
 
 `viewport-fit=cover` is required for edge-to-edge Android 15/16. Do **not** add
 `user-scalable=no`; it breaks accessibility. Use `touch-action: manipulation` on
-the board instead.
+the board instead. A small inline script reads `color-wars:settings` and sets
+`data-theme="dark"` plus `theme-color` before first paint when that theme is
+saved; the app keeps both values in sync at runtime.
 
 ### 4.4 Android SDK versions — `android/variables.gradle`
 
@@ -197,8 +202,10 @@ target 36; a higher target is unsupported until a new Capacitor major.
 <item name="android:forceDarkAllowed">false</item>
 ```
 
-The game is light-themed. This prevents WebView auto-dark from inverting the
-board. If dark mode is added later, remove this and implement a real theme.
+Keep `forceDarkAllowed=false`. The game now ships its own light and dark token
+sets, so WebView auto-dark would invert the board on top of the chosen theme.
+Toggling the app theme updates `<html data-theme>` and `color-scheme`; it does
+not change this manifest flag.
 
 ### 4.6 Edge-to-edge (Android 15/16)
 
@@ -241,7 +248,7 @@ v1.0.
 | Restart | New `createGame()` | Manual |
 | Input lock after win | `gameOver` guard | Unit + UI test |
 | Save / resume | Preferences on pause and after each move | Process-death test |
-| Settings (grid, players, names, colours, feedback) | `platform/settings.ts`, stored separately | Reload/process-death test |
+| Settings (theme, grid, players, names, colours, feedback) | `platform/settings.ts`, stored separately | Reload/process-death test; both themes checked |
 | Android back button | `@capacitor/app` listener | Hardware/gesture test |
 | Rotation / split screen | Responsive CSS + safe areas | Matrix test |
 | Offline launch | Bundled assets | Airplane-mode test |
@@ -277,7 +284,9 @@ server; it does not change the packaging model.
   ```
   `GameState` carries `playerCount` (1–4) and `hasPlayed` for all four seats.
 - Settings are stored separately under `color-wars:settings` as
-  `{ version: 2, settings: GameSettings }` (`gridRows` and `gridCols`).
+  `{ version: 3, settings: GameSettings }` (`theme`, `gridRows`, and `gridCols`).
+  Settings v1/v2 are migrated on load; a missing or invalid theme becomes
+  `light`.
 - On launch: validate the schema, check the row/column range, player count,
   owner range, and stability. If anything is invalid — including a version-1
   save — start a new game instead of restoring a corrupt state.
@@ -566,7 +575,10 @@ available, an **armeabi-v7a** device.
 - [ ] Play 1-, 2-, 3-, and 4-player matches; confirm rails and turn order.
 - [ ] Change grid rows/columns to 11×7 and 15×15, plus player count; start a new
   game; confirm the board fits.
-- [ ] Rename players, choose colours, and verify contrast on the board.
+- [ ] Rename players, choose colours, and verify contrast on the board in both
+  themes.
+- [ ] Switch Light/Dark, visit every screen and a live match, restart the app,
+  and confirm the theme is restored without a light flash.
 - [ ] Toggle sound and vibration off; confirm both stay off after relaunch.
 - [ ] Force-stop mid-game; relaunch; state restored.
 - [ ] Upgrade from a version-1 save; confirm it is dropped, not half-loaded.
@@ -576,6 +588,8 @@ available, an **armeabi-v7a** device.
 - [ ] Font size 200%, display size maximum; TalkBack.
 - [ ] Low battery / low memory / background for 30 minutes.
 - [ ] No network requests in the inspector.
+- [ ] Dark and light themes both render dialogs, rails, board, and animations
+  correctly; no WebView auto-dark inversion.
 - [ ] Animation stays at 60 fps on a low-end device.
 - [ ] Upgrade install over the previous version keeps the save.
 - [ ] Release-signed APK installs on a clean device.
