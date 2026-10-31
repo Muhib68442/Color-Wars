@@ -102,9 +102,9 @@ With 3 players the right rail stays empty; with 2 players both rails are
 
 - **Player 2 is always above the board; Player 1 is always below it.**
 - **Player 3** is a vertical card in the left rail and **Player 4** in the right
-  rail. Their names read top-to-bottom, one upright glyph per line (for example
-  `P` `l` `a` `y` `e` `r` `3`), so they stay legible in a narrow rail on a
-  phone. The rails exist in the DOM at all times but are `hidden` unless
+  rail. Their names use rotated vertical text (the whole label turned 90° and
+  read top-to-bottom), so `Player 3` stays compact in a narrow rail on a phone.
+  The rails exist in the DOM at all times but are `hidden` unless
   `playerCount` is 3 or 4.
 - The panels belong to the players, not to the current turn.
 - The game bar holds the menu button, the live turn status, and a matching
@@ -334,8 +334,9 @@ exceeds `state.playerCount`.
   **orbs owned**.
 - The bar cards carry no coloured left border in the idle or active state; a
   name dot in the player colour identifies the owner.
-- The rail cards use a 6 px top border and a vertical layout, with the player
-  name set in vertical writing mode (upright glyphs stacked top-to-bottom).
+- The rail cards have no coloured top border; their player name is set in
+  rotated vertical text (`writing-mode: vertical-rl`, `text-orientation:
+  mixed`), so the label reads sideways from top to bottom.
 - The active player's card gets a soft tint, a 2 px coloured ring, and a
   "playing" pill (bar cards) or "turn" pill (rail cards). The turn is signalled
   by text, colour, position, and the bar — not colour alone.
