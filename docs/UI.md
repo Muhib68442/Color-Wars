@@ -63,7 +63,8 @@ enabled.
 - Logo, display-font title, one-paragraph description, then actions.
 - **Resume** and **New game** are full-width stacked buttons; the remaining
   three actions sit in a wrapped, centred row.
-- **Resume** is disabled when there is no save or the saved match is finished.
+- **Resume** is only rendered when an unfinished save exists; it is hidden when
+  there is no save or the saved match is finished.
 - The note under the actions reports the saved match, the last result, or the
   configuration the next **New game** will use.
 - The screen scrolls internally on very short viewports.
@@ -101,7 +102,9 @@ With 3 players the right rail stays empty; with 2 players both rails are
 
 - **Player 2 is always above the board; Player 1 is always below it.**
 - **Player 3** is a vertical card in the left rail and **Player 4** in the right
-  rail. The rails exist in the DOM at all times but are `hidden` unless
+  rail. Their names read top-to-bottom, one upright glyph per line (for example
+  `P` `l` `a` `y` `e` `r` `3`), so they stay legible in a narrow rail on a
+  phone. The rails exist in the DOM at all times but are `hidden` unless
   `playerCount` is 3 or 4.
 - The panels belong to the players, not to the current turn.
 - The game bar holds the menu button, the live turn status, and a matching
@@ -294,7 +297,7 @@ remote font request, so the app works offline.
 
 - Centred column with the app mark, display-font title, and a one-paragraph
   description.
-- **Resume** is the primary action and is enabled only for an unfinished save.
+- **Resume** is the primary action and appears only for an unfinished save.
 - **New game** always starts a fresh match and clears the previous save.
 - **Settings**, **How to play**, and **About** are quiet buttons in a wrapped
   row.
@@ -329,8 +332,10 @@ exceeds `state.playerCount`.
 
 - Each card shows the player's custom name (or `Player N`), **cells owned**, and
   **orbs owned**.
-- The bar cards use a 6 px left border and a name dot in the player colour; the
-  rail cards use a 6 px top border and a vertical layout.
+- The bar cards carry no coloured left border in the idle or active state; a
+  name dot in the player colour identifies the owner.
+- The rail cards use a 6 px top border and a vertical layout, with the player
+  name set in vertical writing mode (upright glyphs stacked top-to-bottom).
 - The active player's card gets a soft tint, a 2 px coloured ring, and a
   "playing" pill (bar cards) or "turn" pill (rail cards). The turn is signalled
   by text, colour, position, and the bar — not colour alone.
@@ -431,7 +436,7 @@ Behaviour:
 - Clicking the backdrop closes the dialog.
 - Closing restores focus to the board.
 - A finished saved game does not pop the dialog on launch; the home screen
-  reports the result and **Resume** stays disabled.
+  reports the result and **Resume** is hidden.
 
 ---
 
@@ -439,9 +444,9 @@ Behaviour:
 
 | State | Representation |
 | --- | --- |
-| Home, no save | Logo, title, disabled **Resume**, **New game** + links, `New game · …` note |
-| Home, saved match | Enabled **Resume**, **New game**, saved-match note |
-| Home, finished match | Disabled **Resume**, **New game**, last-result note |
+| Home, no save | Logo, title, **New game** + links (no **Resume**), `New game · …` note |
+| Home, saved match | **Resume** and **New game**, saved-match note |
+| Home, finished match | **New game** + links (no **Resume**), last-result note |
 | Empty cell | Grey circle with a border |
 | Player 1–4 cell | Solid custom colour, owner-specific orb pattern |
 | Legal target | Pointer cursor, hover ring, press scale |
@@ -528,7 +533,7 @@ never show an orb the model does not contain (the legacy "ghost coin" bug).
 - Score cards keep an accessible name from the player's custom name.
 - Screen changes move focus deliberately: **New game**/**Resume** lands on the
   board, the rules/settings/about screens land on **Back**, and returning home
-  lands on **Resume** when enabled, otherwise **New game**.
+  lands on **Resume** when it is shown, otherwise **New game**.
 
 Not yet covered: a dedicated high-contrast theme and TalkBack-specific testing
 on a physical device (Phase 3).

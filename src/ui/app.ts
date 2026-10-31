@@ -98,6 +98,7 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
 
   function updateHome(): void {
     const resumable = hasSave && !state.gameOver;
+    shell.resumeButton.hidden = !resumable;
     shell.resumeButton.disabled = !resumable;
     shell.resumeButton.setAttribute(
       "aria-disabled",

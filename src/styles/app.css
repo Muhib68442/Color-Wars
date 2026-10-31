@@ -305,10 +305,8 @@ p {
   transition: background-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* Player 2 sits above the board, Player 1 below it. */
-.score--bar {
-  border-left: 6px solid var(--pc);
-}
+/* Player 2 sits above the board, Player 1 below it. The bar cards carry no
+   coloured left border in either the idle or the active state. */
 
 /* Players 3 and 4 sit on the left and right in portrait, or read as
    vertical side cards in the wide layout. */
@@ -379,11 +377,16 @@ p {
 }
 
 .score--rail .score__name {
-  flex-direction: column;
-  gap: 5px;
+  flex-direction: row;
+  justify-content: center;
+  gap: 4px;
+  writing-mode: vertical-rl;
+  text-orientation: upright;
   font-size: 13px;
-  white-space: normal;
-  overflow-wrap: anywhere;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
 }
 
 .score--rail .score__name::before {
@@ -407,6 +410,7 @@ p {
 
 .score--rail.is-active .score__name::after {
   content: "turn";
+  writing-mode: horizontal-tb;
 }
 
 /* ---------- Board ---------- */
@@ -1147,9 +1151,8 @@ p {
   }
 
   .home__actions {
-    grid-auto-flow: column;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    width: auto;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    width: min(560px, 100%);
   }
 
   .home__links {

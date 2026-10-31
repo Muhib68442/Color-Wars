@@ -179,7 +179,7 @@ function visibleScores(root: HTMLElement): HTMLElement[] {
 }
 
 describe("home screen", () => {
-  it("boots on the home screen with all five actions", () => {
+  it("boots on the home screen with the primary actions", () => {
     const { root, app } = mount();
 
     expect(app.getScreen()).toBe("home");
@@ -193,6 +193,7 @@ describe("home screen", () => {
 
     expect(button(root, "resume").textContent?.trim()).toBe("Resume");
     expect(button(root, "resume").disabled).toBe(true);
+    expect(button(root, "resume").hidden).toBe(true);
     expect(button(root, "new-game").textContent?.trim()).toBe("New game");
     expect(button(root, "settings").textContent?.trim()).toBe("Settings");
     expect(button(root, "how-to").textContent?.trim()).toBe("How to play");
@@ -213,10 +214,11 @@ describe("home screen", () => {
     expect(root.querySelectorAll("button.cell")).toHaveLength(49);
   });
 
-  it("enables Resume and describes the saved match", () => {
+  it("shows Resume and describes the saved match", () => {
     const saved = applyMove(createGame(), { row: 0, col: 0 }).state;
     const { root, app } = mount({ seed: saved });
 
+    expect(button(root, "resume").hidden).toBe(false);
     expect(button(root, "resume").disabled).toBe(false);
     expect(saveNote(root)).toContain("Saved match");
     expect(saveNote(root)).toContain("Player 2 to move");
@@ -621,6 +623,7 @@ describe("winning", () => {
 
     expect(app.getScreen()).toBe("home");
     expect(button(root, "resume").disabled).toBe(true);
+    expect(button(root, "resume").hidden).toBe(true);
     expect(saveNote(root)).toBe("Last game: Player 1 won.");
   });
 });
@@ -659,6 +662,7 @@ describe("game menu", () => {
 
     expect(app.getScreen()).toBe("home");
     expect(button(root, "resume").disabled).toBe(false);
+    expect(button(root, "resume").hidden).toBe(false);
     expect(app.getState().moveCount).toBe(1);
 
     resumeMatch(root);
@@ -681,6 +685,7 @@ describe("save and resume", () => {
     expect(second.app.getState().moveCount).toBe(2);
     expect(second.app.getState().currentPlayer).toBe(1);
     expect(button(second.root, "resume").disabled).toBe(false);
+    expect(button(second.root, "resume").hidden).toBe(false);
     expect(orbsOn(second.root, 0, 0)).toBe(1);
     expect(orbsOn(second.root, 6, 6)).toBe(1);
 
@@ -698,6 +703,7 @@ describe("save and resume", () => {
     expect(root.querySelectorAll("button.cell[data-orbs='0']")).toHaveLength(49);
     expect(store.getItem(SAVE_KEY)).toBeNull();
     expect(button(root, "resume").disabled).toBe(true);
+    expect(button(root, "resume").hidden).toBe(true);
   });
 
   it("does not resume a finished saved game", () => {
@@ -713,6 +719,7 @@ describe("save and resume", () => {
 
     expect(app.getScreen()).toBe("home");
     expect(button(root, "resume").disabled).toBe(true);
+    expect(button(root, "resume").hidden).toBe(true);
     expect(saveNote(root)).toBe("Last game: Player 1 won.");
 
     startMatch(root);

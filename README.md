@@ -51,11 +51,11 @@ work happens on the web/Android build.
 - Cascades resolve automatically. A player with no orbs left is eliminated; the
   last player with orbs wins. Solo mode is a non-ending practice board.
 
-The app opens on a home screen with **Resume**, **New game**, **Settings**,
-**How to play**, and **About**.
+The app opens on a home screen with **New game**, **Settings**, **How to play**,
+and **About**, plus **Resume** when an unfinished saved match exists.
 
-- **Resume** restores an unfinished saved match. It is disabled when there is
-  no save or the last match is finished.
+- **Resume** restores an unfinished saved match. It only appears when such a
+  save exists; with no save, or after a finished match, the button is hidden.
 - **New game** starts a fresh match and discards any previous save.
 - **Settings** controls difficulty (UI placeholder for the future bot), grid
   size, number of players, per-player names and colours, sound, and vibration.
