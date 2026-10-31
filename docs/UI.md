@@ -345,7 +345,8 @@ exceeds `state.playerCount`.
 - The rail cards have no coloured top border; their player name and the
   cells/orbs counters are set in rotated vertical text (`writing-mode:
   vertical-rl`, `text-orientation: mixed`), so each line reads sideways from
-  top to bottom. The "playing" pill is horizontal, exactly like the P1/P2 bars.
+  top to bottom. The "playing" pill is rotated vertical in the same way, while
+  its word and styling stay the same as the P1/P2 badge.
 - A rail card is exactly as thick as a P1/P2 bar card is tall
   (`--score-thickness`, 40 px by default), so all four cards share one thickness.
 - The active player's card gets a soft tint, a 2 px coloured ring, and a
