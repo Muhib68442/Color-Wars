@@ -663,6 +663,12 @@ describe("game menu", () => {
     cellButton(root, 0, 0).click();
 
     button(root, "menu").click();
+    expect(overlayActions(root).map((item) => item.textContent)).toEqual([
+      "Keep playing",
+      "Restart match",
+      "How to play",
+      "Back to home",
+    ]);
     expect(
       action(root, "Keep playing").classList.contains("btn--primary"),
     ).toBe(true);

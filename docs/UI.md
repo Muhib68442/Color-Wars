@@ -323,8 +323,8 @@ remote font request, so the app works offline.
   practice`, `<name> wins!`, or `It's a draw.`
 - `role="status"` and `aria-live="polite"` announce every turn change and the
   result to screen readers.
-- The menu button opens the in-match dialog (How to play, Restart match,
-  Back to home, Keep playing).
+- The menu button opens the in-match dialog (Keep playing, Restart match,
+  How to play, Back to home).
 
 ### 5.3 Player cards (`.score`)
 
@@ -445,8 +445,8 @@ Used for three things:
 2. **Restart confirmation** — title "Restart match?", the warning that the
    match and save will be lost, and **No, keep playing** (primary) /
    **Yes, restart**. Shown when Restart match is chosen during a live game.
-3. **Game menu** — title "Paused", the current turn, **How to play**,
-   **Restart match**, **Back to home**, and **Keep playing** (primary).
+3. **Game menu** — title "Paused", the current turn, **Keep playing** (primary),
+   **Restart match**, **How to play**, and **Back to home**.
 
 Behaviour:
 

@@ -321,6 +321,15 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
         : `${nameOf(state.currentPlayer)} to move.`,
       actions: [
         {
+          label: "Keep playing",
+          variant: "primary",
+          run: () => overlay.close(),
+        },
+        {
+          label: "Restart match",
+          run: () => requestNewGame(),
+        },
+        {
           label: "How to play",
           run: () => {
             overlay.close();
@@ -329,20 +338,11 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
           },
         },
         {
-          label: "Restart match",
-          run: () => requestNewGame(),
-        },
-        {
           label: "Back to home",
           run: () => {
             overlay.close();
             showScreen("home");
           },
-        },
-        {
-          label: "Keep playing",
-          variant: "primary",
-          run: () => overlay.close(),
         },
       ],
     });
