@@ -1,16 +1,17 @@
 # Color Wars
 
-A local **Chain Reaction**–style game for **one to four players** on a square
-grid from **7×7 to 15×15**. Click a cell to add an orb; a cell that reaches its
-capacity explodes and sends one orb to each orthogonal neighbour, converting
-enemy orbs along the way. The last player with orbs on the board wins.
+A local **Chain Reaction**–style game for **one to four players** on a
+rectangular grid with **7–15 rows and 7–15 columns** (for example 11×7 or
+15×15). Click a cell to add an orb; a cell that reaches its capacity explodes
+and sends one orb to each orthogonal neighbour, converting enemy orbs along the
+way. The last player with orbs on the board wins.
 
 The **web implementation is the product**. It will ship as an Android app built
 with Capacitor (see [`docs/ANDROID.md`](docs/ANDROID.md)). The Pygame prototype
 in `legacy/main.py` is archived for reference and is no longer maintained.
 
 > **Status: playable web build.** The pure engine, home/menu flow, settings,
-> multi-player boards, and save/resume are complete and covered by 87 Vitest
+> multi-player boards, and save/resume are complete and covered by 91 Vitest
 > tests. Phase 3 wraps the Vite build in a Capacitor Android shell; Phase 4
 > handles signing and release. See the [roadmap](#roadmap).
 
@@ -58,8 +59,8 @@ and **About**, plus **Resume** when an unfinished saved match exists.
   save exists; with no save, or after a finished match, the button is hidden.
 - **New game** starts a fresh match and discards any previous save.
 - **Settings** controls difficulty (UI placeholder for the future bot), grid
-  size, number of players, per-player names and colours, sound, and vibration.
-  Changes are saved immediately.
+  rows and columns, number of players, per-player names and colours, sound, and
+  vibration. Changes are saved immediately.
 - The in-match menu offers How to play, Restart, and Back to home. When the game
   ends, a result dialog appears and the board is locked until you start again.
 

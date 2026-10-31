@@ -128,6 +128,13 @@ function settingsRoot(root: HTMLElement): HTMLElement {
   return screen;
 }
 
+function gridValue(root: HTMLElement, axis: "rows" | "cols"): string {
+  return (
+    settingsRoot(root).querySelector(`[data-role='grid-${axis}-value']`)
+      ?.textContent ?? ""
+  );
+}
+
 function playerRow(root: HTMLElement, player: number): HTMLElement {
   const row = settingsRoot(root).querySelector<HTMLElement>(
     `.player-row[data-player="${player}"]`,
@@ -252,9 +259,8 @@ describe("settings", () => {
     expect(app.getScreen()).toBe("settings");
     expect(screenIs(root, "settings")).toBe(true);
     expect(root.querySelector("#settings-title")?.textContent).toBe("Settings");
-    expect(
-      settingsRoot(root).querySelector("[data-role='grid-value']")?.textContent,
-    ).toBe("7 × 7");
+    expect(gridValue(root, "rows")).toBe("7");
+    expect(gridValue(root, "cols")).toBe("7");
 
     const medium = settingsRoot(root).querySelector<HTMLButtonElement>(
       "[data-difficulty='medium']",
@@ -279,29 +285,53 @@ describe("settings", () => {
     expect(app.getScreen()).toBe("home");
   });
 
-  it("steps the grid size and recreates the board on the next game", () => {
+  it("steps rows and columns independently and recreates the board", () => {
     const { root, app, settingsStore } = mount();
 
     button(root, "settings").click();
-    const minus = button(root, "grid-minus");
-    const plus = button(root, "grid-plus");
-    expect(minus.disabled).toBe(true);
+    const rowsMinus = button(root, "grid-rows-minus");
+    const rowsPlus = button(root, "grid-rows-plus");
+    const colsMinus = button(root, "grid-cols-minus");
+    const colsPlus = button(root, "grid-cols-plus");
+    expect(rowsMinus.disabled).toBe(true);
+    expect(colsMinus.disabled).toBe(true);
 
-    plus.click();
-    plus.click();
-    expect(
-      settingsRoot(root).querySelector("[data-role='grid-value']")?.textContent,
-    ).toBe("9 × 9");
-    expect(settingsStore.load().gridSize).toBe(9);
+    rowsPlus.click();
+    rowsPlus.click();
+    colsPlus.click();
+    expect(gridValue(root, "rows")).toBe("9");
+    expect(gridValue(root, "cols")).toBe("8");
+    expect(settingsStore.load().gridRows).toBe(9);
+    expect(settingsStore.load().gridCols).toBe(8);
 
-    minus.click();
-    expect(settingsStore.load().gridSize).toBe(8);
+    rowsMinus.click();
+    expect(settingsStore.load().gridRows).toBe(8);
 
     button(root, "settings-back").click();
     startMatch(root);
 
     expect(app.getState().rows).toBe(8);
+    expect(app.getState().cols).toBe(8);
     expect(root.querySelectorAll("button.cell")).toHaveLength(64);
+  });
+
+  it("builds an 11 by 7 board for four players", () => {
+    const { root, app, settingsStore } = mount();
+
+    button(root, "settings").click();
+    for (let step = 0; step < 4; step += 1) {
+      button(root, "grid-rows-plus").click();
+    }
+    selectPlayerCount(root, 4);
+    button(root, "settings-back").click();
+    startMatch(root);
+
+    expect(settingsStore.load().gridRows).toBe(11);
+    expect(settingsStore.load().gridCols).toBe(7);
+    expect(app.getState().playerCount).toBe(4);
+    expect(app.getState().rows).toBe(11);
+    expect(app.getState().cols).toBe(7);
+    expect(root.querySelectorAll("button.cell")).toHaveLength(77);
   });
 
   it("switches between one and four players", () => {
@@ -401,17 +431,15 @@ describe("settings", () => {
     const first = mount({ store });
 
     button(first.root, "settings").click();
-    button(first.root, "grid-plus").click();
+    button(first.root, "grid-rows-plus").click();
     countButton(first.root, 3).click();
     button(first.root, "settings-back").click();
 
     const second = mount({ store });
     button(second.root, "settings").click();
 
-    expect(
-      settingsRoot(second.root).querySelector("[data-role='grid-value']")
-        ?.textContent,
-    ).toBe("8 × 8");
+    expect(gridValue(second.root, "rows")).toBe("8");
+    expect(gridValue(second.root, "cols")).toBe("7");
     expect(countButton(second.root, 3).getAttribute("aria-pressed")).toBe(
       "true",
     );

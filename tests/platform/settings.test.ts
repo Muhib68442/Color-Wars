@@ -18,7 +18,8 @@ describe("settings defaults", () => {
     const settings = defaultSettings();
 
     expect(settings.difficulty).toBe("medium");
-    expect(settings.gridSize).toBe(7);
+    expect(settings.gridRows).toBe(7);
+    expect(settings.gridCols).toBe(7);
     expect(settings.playerCount).toBe(2);
     expect(settings.sound).toBe(true);
     expect(settings.vibration).toBe(true);
@@ -28,12 +29,28 @@ describe("settings defaults", () => {
 });
 
 describe("normalizeSettings", () => {
-  it("clamps grid size and player count into range", () => {
-    expect(normalizeSettings({ gridSize: 3 }).gridSize).toBe(7);
-    expect(normalizeSettings({ gridSize: 99 }).gridSize).toBe(15);
-    expect(normalizeSettings({ gridSize: 10.6 }).gridSize).toBe(11);
+  it("clamps each grid axis and player count into range", () => {
+    expect(normalizeSettings({ gridRows: 3 }).gridRows).toBe(7);
+    expect(normalizeSettings({ gridRows: 99 }).gridRows).toBe(15);
+    expect(normalizeSettings({ gridRows: 10.6 }).gridRows).toBe(11);
+    expect(normalizeSettings({ gridCols: 3 }).gridCols).toBe(7);
+    expect(normalizeSettings({ gridCols: 99 }).gridCols).toBe(15);
     expect(normalizeSettings({ playerCount: 0 }).playerCount).toBe(1);
     expect(normalizeSettings({ playerCount: 9 }).playerCount).toBe(4);
+  });
+
+  it("keeps rectangular boards, such as 11 rows by 7 columns", () => {
+    const settings = normalizeSettings({ gridRows: 11, gridCols: 7 });
+
+    expect(settings.gridRows).toBe(11);
+    expect(settings.gridCols).toBe(7);
+  });
+
+  it("migrates the version-1 square grid size onto both axes", () => {
+    const settings = normalizeSettings({ gridSize: 12 });
+
+    expect(settings.gridRows).toBe(12);
+    expect(settings.gridCols).toBe(12);
   });
 
   it("rejects unknown difficulties and invalid colours", () => {
@@ -101,7 +118,8 @@ describe("settings store", () => {
     const store = memoryStore();
     const settingsStore = createSettingsStore(store);
     const settings = defaultSettings();
-    settings.gridSize = 12;
+    settings.gridRows = 11;
+    settings.gridCols = 7;
     settings.playerCount = 4;
     settings.profiles[2].name = "Blaze";
     settings.sound = false;

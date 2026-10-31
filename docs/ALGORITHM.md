@@ -9,7 +9,8 @@ defects, kept so they are not reintroduced.
 
 ## 1. The game in one paragraph
 
-One to four players take turns on a square grid from 7×7 to 15×15. A turn is
+One to four players take turns on a rectangular grid with 7–15 rows and 7–15
+columns (for example 11×7). A turn is
 either placing a new orb on an empty cell or adding an orb to a cell you already
 own. Every cell has a **capacity** equal to its number of orthogonal neighbours
 (2 in a corner, 3 on an edge, 4 in the interior). When a cell reaches its
@@ -63,9 +64,9 @@ For 7×7:
 2 3 3 3 3 3 2
 ```
 
-The production UI only creates square boards from 7×7 to 15×15 (49–225 cells),
-but the engine's capacity and neighbour helpers work for any rectangle of at
-least 2×2.
+The production UI creates boards with 7–15 rows and 7–15 columns independently
+(77–225 cells), such as 11×7 or 15×15. The engine's capacity and neighbour
+helpers work for any rectangle of at least 2×2.
 
 ---
 
@@ -388,4 +389,5 @@ always rebuilt from the model, never patched ad hoc.
 - [ ] The source cell of a detonation is empty and renders empty.
 - [ ] Board and rendered output always agree after the cascade.
 - [ ] Illegal clicks (enemy cell, after game over) change nothing.
-- [ ] A square grid from 7×7 to 15×15 fits without scrolling or clipped cells.
+- [ ] A board with 7–15 rows and 7–15 columns (including 11×7) fits without
+  scrolling or clipped cells.

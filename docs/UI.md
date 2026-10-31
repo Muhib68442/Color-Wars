@@ -192,10 +192,18 @@ body
     │       ├── section.panel                        Match
     │       │   ├── div.segmented[data-role="difficulty"]
     │       │   │   └── button[data-difficulty="easy|medium|hard"]
-    │       │   └── div.stepper
-    │       │       ├── button[data-action="grid-minus"]
-    │       │       ├── output[data-role="grid-value"]
-    │       │       └── button[data-action="grid-plus"]
+    │       │   └── div.grid-size
+    │       │       ├── div.stepper
+    │       │       │   ├── button[data-action="grid-rows-minus"]
+    │       │       │   ├── output[data-role="grid-rows-value"]
+    │       │       │   ├── button[data-action="grid-rows-plus"]
+    │       │       │   └── span.stepper__label                    "rows"
+    │       │       ├── span.grid-size__by                        "×"
+    │       │       └── div.stepper
+    │       │           ├── button[data-action="grid-cols-minus"]
+    │       │           ├── output[data-role="grid-cols-value"]
+    │       │           ├── button[data-action="grid-cols-plus"]
+    │       │           └── span.stepper__label                    "columns"
     │       ├── section.panel                        Players
     │       │   ├── div.segmented[data-role="player-count"]
     │       │   │   └── button[data-count="1|2|3|4"]
@@ -341,18 +349,20 @@ exceeds `state.playerCount`.
 - A rail card is exactly as thick as a P1/P2 bar card is tall
   (`--score-thickness`, 40 px by default), so all four cards share one thickness.
 - The active player's card gets a soft tint, a 2 px coloured ring, and a
-  "playing" pill (bar cards) or "turn" pill (rail cards). The turn is signalled
+  "playing" pill. All four cards use the same indicator; the turn is signalled
   by text, colour, position, and the bar — not colour alone.
 - Stats are recomputed from `GameState` on every render:
   `countCells` / `countOrbs`.
 
 ### 5.4 Board (`.board`)
 
-- Square CSS grid driven by `--cols`: `repeat(var(--cols, 7), minmax(0, 1fr))`.
-- Width: `min(100%, 52vh, 560px)`, so it fits phones, tablets, and desktop
-  without scrolling; the board never exceeds the centre column.
-- The board is re-created when the grid size changes. It supports 7×7 through
-  15×15 (49–225 cells).
+- CSS grid driven by `--cols` and `--rows`:
+  `repeat(var(--cols, 7), minmax(0, 1fr))`; square cells size the rows.
+- Width: `min(100%, calc(52vh * var(--cols) / var(--rows)), 560px)`, so any
+  rectangle fits without scrolling and the board never exceeds the centre
+  column. An 11×7 board is taller than it is wide; a 7×11 board is wider.
+- The board is re-created when either grid axis changes. Each axis supports 7
+  through 15 (11×7 = 77 cells, 15×15 = 225 cells).
 - White frame with rounded corners and a small shadow.
 - `touch-action: manipulation` removes the 300 ms tap delay on Android without
   disabling pinch-zoom for accessibility.
@@ -393,8 +403,10 @@ exceeds `state.playerCount`.
 
 - **Difficulty** segmented control: Easy / Medium / Hard. Saved immediately but
   currently UI-only; a `Bot · soon` badge makes the status explicit.
-- **Grid size** stepper: 7–15, step 1, with the minus/plus buttons disabled at
-  the limits. Shows `<n> × <n>`. Applies on the next **New game**.
+- **Grid size** has one stepper per axis: rows and columns each 7–15, step 1,
+  with the minus/plus buttons disabled at the limits. The two values are shown
+  as `<rows> × <columns>`, so boards such as 11×7 are possible. Applies on the
+  next **New game**.
 - **Number of players** segmented control: 1 / 2 / 3 / 4. Applies on the next
   **New game** and reveals the matching player rows.
 - **Player rows**: a native colour input and a text input capped at 16
@@ -455,7 +467,7 @@ Behaviour:
 | Player 1–4 cell | Solid custom colour, owner-specific orb pattern |
 | Legal target | Pointer cursor, hover ring, press scale |
 | Illegal target | No pointer, `aria-disabled="true"` |
-| Active player | Card tint + ring + "playing"/"turn" pill, coloured plain-text status |
+| Active player | Card tint + ring + "playing" pill, coloured plain-text status |
 | Explosion | Source cell cleared; surrounding cells flash via Web Animations |
 | Transfer / capture | Destination cell brightness flash, orb pop |
 | Win | Status text + modal dialog; board locked |
@@ -523,11 +535,11 @@ never show an orb the model does not contain (the legacy "ghost coin" bug).
 - Every cell is a `<button>` with a descriptive `aria-label` including row,
   column, owner name, and orb count.
 - The turn and result text live in an `aria-live="polite"` status region; the
-  grid value in Settings is also live.
+  row and column values in Settings are also live.
 - Illegal cells expose `aria-disabled="true"`; the game-over state disables all
   cells.
 - Ownership is not colour-only: each player has a distinct orb fill/ring and the
-  active card has a text "playing"/"turn" pill.
+  active card has a text "playing" pill.
 - Visible `:focus-visible` rings on cells, icon buttons, steppers, inputs, and
   text buttons.
 - Full keyboard play with a single board tab stop.

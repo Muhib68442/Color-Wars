@@ -54,7 +54,7 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
   let hasSave = loaded !== null;
   let state =
     loaded ??
-    createGame(settings.gridSize, settings.gridSize, settings.playerCount);
+    createGame(settings.gridRows, settings.gridCols, settings.playerCount);
   let screen: ScreenName = "home";
   let infoReturn: "home" | "game" = "home";
 
@@ -120,7 +120,7 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
     }
 
     shell.saveNote.textContent =
-      `New game · ${settings.gridSize} × ${settings.gridSize} · ` +
+      `New game · ${settings.gridRows} × ${settings.gridCols} · ` +
       playerSummary(settings.playerCount);
   }
 
@@ -171,9 +171,13 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
       button.setAttribute("aria-pressed", active ? "true" : "false");
     }
 
-    refs.gridValue.textContent = `${settings.gridSize} × ${settings.gridSize}`;
-    refs.gridMinus.disabled = settings.gridSize <= MIN_GRID_SIZE;
-    refs.gridPlus.disabled = settings.gridSize >= MAX_GRID_SIZE;
+    refs.gridRowsValue.textContent = String(settings.gridRows);
+    refs.gridRowsMinus.disabled = settings.gridRows <= MIN_GRID_SIZE;
+    refs.gridRowsPlus.disabled = settings.gridRows >= MAX_GRID_SIZE;
+
+    refs.gridColsValue.textContent = String(settings.gridCols);
+    refs.gridColsMinus.disabled = settings.gridCols <= MIN_GRID_SIZE;
+    refs.gridColsPlus.disabled = settings.gridCols >= MAX_GRID_SIZE;
 
     for (const player of PLAYERS) {
       const row = refs.playerRows[player];
@@ -263,8 +267,8 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
   function newGame(): void {
     overlay.close();
     state = createGame(
-      settings.gridSize,
-      settings.gridSize,
+      settings.gridRows,
+      settings.gridCols,
       settings.playerCount,
     );
     hasSave = false;
@@ -347,13 +351,15 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
     });
   }
 
-  function changeGrid(delta: number): void {
+  function changeGridAxis(axis: "rows" | "cols", delta: number): void {
+    const key = axis === "rows" ? "gridRows" : "gridCols";
+    const current = settings[key];
     const next = Math.min(
-      Math.max(settings.gridSize + delta, MIN_GRID_SIZE),
+      Math.max(current + delta, MIN_GRID_SIZE),
       MAX_GRID_SIZE,
     );
-    if (next === settings.gridSize) return;
-    settings.gridSize = next;
+    if (next === current) return;
+    settings[key] = next;
     saveSettings();
     populateSettings();
     updateHome();
@@ -408,8 +414,18 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
     });
   }
 
-  shell.settingsRefs.gridMinus.addEventListener("click", () => changeGrid(-1));
-  shell.settingsRefs.gridPlus.addEventListener("click", () => changeGrid(1));
+  shell.settingsRefs.gridRowsMinus.addEventListener("click", () =>
+    changeGridAxis("rows", -1),
+  );
+  shell.settingsRefs.gridRowsPlus.addEventListener("click", () =>
+    changeGridAxis("rows", 1),
+  );
+  shell.settingsRefs.gridColsMinus.addEventListener("click", () =>
+    changeGridAxis("cols", -1),
+  );
+  shell.settingsRefs.gridColsPlus.addEventListener("click", () =>
+    changeGridAxis("cols", 1),
+  );
 
   for (const player of PLAYERS) {
     const row = shell.settingsRefs.playerRows[player];

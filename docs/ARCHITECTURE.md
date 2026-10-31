@@ -16,14 +16,15 @@ through each implementation, and where the two versions diverge.
 
 ## 1. System overview
 
-Color Wars is a hot-seat board game for **one to four players** on a square grid
-from **7×7 to 15×15**. Historically it shipped as two disagreeing codebases that
-shared only the rules in spirit:
+Color Wars is a hot-seat board game for **one to four players** on a rectangular
+grid with **7–15 rows and 7–15 columns** (for example 11×7 or 15×15).
+Historically it shipped as two disagreeing codebases that shared only the rules
+in spirit:
 
 ```
                     ┌─────────────────────────────┐
                     │        Game rules           │
-                    │ 7×7–15×15 · 1–4 players ·   │
+                    │ 7–15 per axis · 1–4 players ·  │
                     │  turns · orb explosions     │
                     └──────────────┬──────────────┘
                                    │ (implemented twice)
@@ -325,8 +326,8 @@ type GameEvent =
   **about**), the compact turn status, up to four score cards, dialogs, and
   input locking.
 - Apply player names and colours from settings to the score cards, board
-  labels, and palette tokens; grid size and player count take effect on the
-  next **New game**.
+  labels, and palette tokens; grid rows/columns and player count take effect on
+  the next **New game**.
 - Contain **no rule logic** (no capacity checks, no winner checks).
 
 #### Platform contract
@@ -365,7 +366,7 @@ so the same build runs in a desktop browser and inside the APK.
 | 0 | git baseline, archive `legacy/main.py`, keep the legacy web UI playable | **done** |
 | 1 | pure TypeScript engine + Vitest suite (no visual change) | **done** |
 | 2 | rewrite the UI against the engine: visible turn banner, win overlay, restart, save/resume, accessibility | **done** |
-| 2.5 | home menu, settings, 1–4 players, 7×7–15×15 grids, names/colours, sound and vibration toggles | **done** |
+| 2.5 | home menu, settings, 1–4 players, 7–15 rows/columns, names/colours, sound and vibration toggles | **done** |
 | 3 | Capacitor shell, Android project, Preferences persistence hardening, device testing | next |
 | 4 | signing, release build, Play checklist, hardening | planned |
 
@@ -430,7 +431,8 @@ of Capacitor. The suite currently has **87 tests across 8 files**.
    - empty cells and own cells are legal;
    - enemy cells, out-of-bounds moves, and moves after game over are rejected
      without mutating state;
-   - `createGame(rows, cols, playerCount)` builds the requested square board;
+   - `createGame(rows, cols, playerCount)` builds the requested rectangular
+     board;
    - turns cycle 1→2→3→4→1 and skip eliminated players.
 3. **Cascades** (`tests/engine/cascade.test.ts`)
    - a detonation clears the source and spreads to exactly the in-bounds

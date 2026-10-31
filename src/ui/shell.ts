@@ -17,9 +17,12 @@ export interface PlayerRowRefs {
 export interface SettingsRefs {
   difficultyButtons: HTMLButtonElement[];
   playerCountButtons: HTMLButtonElement[];
-  gridValue: HTMLElement;
-  gridMinus: HTMLButtonElement;
-  gridPlus: HTMLButtonElement;
+  gridRowsValue: HTMLElement;
+  gridRowsMinus: HTMLButtonElement;
+  gridRowsPlus: HTMLButtonElement;
+  gridColsValue: HTMLElement;
+  gridColsMinus: HTMLButtonElement;
+  gridColsPlus: HTMLButtonElement;
   playerRows: Record<Player, PlayerRowRefs>;
   sound: HTMLInputElement;
   vibration: HTMLInputElement;
@@ -280,18 +283,35 @@ const SHELL_TEMPLATE = /* html */ `
         </div>
 
         <div class="field">
-          <span class="field__label">Grid size</span>
-          <div class="stepper">
-            <button class="stepper__btn" type="button" data-action="grid-minus" aria-label="Decrease grid size">
-              −
-            </button>
-            <output class="stepper__value" data-role="grid-value" aria-live="polite">7 × 7</output>
-            <button class="stepper__btn" type="button" data-action="grid-plus" aria-label="Increase grid size">
-              +
-            </button>
+          <div class="field__head">
+            <span class="field__label">Board size</span>
+          </div>
+          <div class="grid-size">
+            <div class="stepper">
+              <button class="stepper__btn" type="button" data-action="grid-rows-minus" aria-label="Decrease rows">
+                −
+              </button>
+              <output class="stepper__value" data-role="grid-rows-value" aria-live="polite">7</output>
+              <button class="stepper__btn" type="button" data-action="grid-rows-plus" aria-label="Increase rows">
+                +
+              </button>
+              <span class="stepper__label">rows</span>
+            </div>
+            <span class="grid-size__by" aria-hidden="true">×</span>
+            <div class="stepper">
+              <button class="stepper__btn" type="button" data-action="grid-cols-minus" aria-label="Decrease columns">
+                −
+              </button>
+              <output class="stepper__value" data-role="grid-cols-value" aria-live="polite">7</output>
+              <button class="stepper__btn" type="button" data-action="grid-cols-plus" aria-label="Increase columns">
+                +
+              </button>
+              <span class="stepper__label">columns</span>
+            </div>
           </div>
           <p class="field__hint">
-            Square board from 7 × 7 to 15 × 15. Applies to new games.
+            Rows and columns can each be 7 to 15, so boards like 11 × 7 work.
+            Applies to new games.
           </p>
         </div>
       </section>
@@ -493,14 +513,29 @@ export function mountShell(root: HTMLElement): Shell {
       playerCountButtons: Array.from(
         root.querySelectorAll<HTMLButtonElement>("[data-count]"),
       ),
-      gridValue: requireElement<HTMLElement>(root, "[data-role='grid-value']"),
-      gridMinus: requireElement<HTMLButtonElement>(
+      gridRowsValue: requireElement<HTMLElement>(
         root,
-        "[data-action='grid-minus']",
+        "[data-role='grid-rows-value']",
       ),
-      gridPlus: requireElement<HTMLButtonElement>(
+      gridRowsMinus: requireElement<HTMLButtonElement>(
         root,
-        "[data-action='grid-plus']",
+        "[data-action='grid-rows-minus']",
+      ),
+      gridRowsPlus: requireElement<HTMLButtonElement>(
+        root,
+        "[data-action='grid-rows-plus']",
+      ),
+      gridColsValue: requireElement<HTMLElement>(
+        root,
+        "[data-role='grid-cols-value']",
+      ),
+      gridColsMinus: requireElement<HTMLButtonElement>(
+        root,
+        "[data-action='grid-cols-minus']",
+      ),
+      gridColsPlus: requireElement<HTMLButtonElement>(
+        root,
+        "[data-action='grid-cols-plus']",
       ),
       playerRows: {
         1: playerRowRefs(root, 1),

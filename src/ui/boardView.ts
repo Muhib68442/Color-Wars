@@ -81,6 +81,7 @@ export function createBoardView(
     cols = nextCols;
     cells.clear();
     element.replaceChildren();
+    element.style.setProperty("--rows", String(nextRows));
     element.style.setProperty("--cols", String(nextCols));
     element.setAttribute("aria-label", `Board, ${nextRows} by ${nextCols}`);
 

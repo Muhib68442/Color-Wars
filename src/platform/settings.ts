@@ -9,7 +9,7 @@ import {
 import { isRecord, type KeyValueStore } from "./storage.js";
 
 export const SETTINGS_KEY = "color-wars:settings";
-export const SETTINGS_VERSION = 1;
+export const SETTINGS_VERSION = 2;
 export const MAX_NAME_LENGTH = 16;
 
 export type Difficulty = "easy" | "medium" | "hard";
@@ -21,7 +21,8 @@ export interface PlayerProfile {
 
 export interface GameSettings {
   difficulty: Difficulty;
-  gridSize: number;
+  gridRows: number;
+  gridCols: number;
   playerCount: PlayerCount;
   profiles: Record<Player, PlayerProfile>;
   sound: boolean;
@@ -46,7 +47,8 @@ const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 export function defaultSettings(): GameSettings {
   return {
     difficulty: "medium",
-    gridSize: MIN_GRID_SIZE,
+    gridRows: MIN_GRID_SIZE,
+    gridCols: MIN_GRID_SIZE,
     playerCount: 2,
     profiles: {
       1: { ...DEFAULT_PROFILES[1] },
@@ -112,15 +114,29 @@ export function normalizeSettings(value: unknown): GameSettings {
     defaults.playerCount,
   ) as PlayerCount;
 
+  // Settings v1 stored one square `gridSize`; both axes inherit it on load.
+  const legacySize = clampInt(
+    value["gridSize"],
+    MIN_GRID_SIZE,
+    MAX_GRID_SIZE,
+    defaults.gridRows,
+  );
+
   return {
     difficulty: isDifficulty(value["difficulty"])
       ? value["difficulty"]
       : defaults.difficulty,
-    gridSize: clampInt(
-      value["gridSize"],
+    gridRows: clampInt(
+      value["gridRows"],
       MIN_GRID_SIZE,
       MAX_GRID_SIZE,
-      defaults.gridSize,
+      legacySize,
+    ),
+    gridCols: clampInt(
+      value["gridCols"],
+      MIN_GRID_SIZE,
+      MAX_GRID_SIZE,
+      legacySize,
     ),
     playerCount,
     profiles,

@@ -43,9 +43,10 @@ function isPlayerInRange(value: unknown, playerCount: number): value is Player {
 }
 
 /**
- * Accepts only a complete, stable square board within the supported range.
- * A corrupt or half-written save must never reach the renderer; the caller
- * starts a new game instead.
+ * Accepts only a complete, stable board within the supported range on each
+ * axis, so rectangular boards such as 11 × 7 load too. A corrupt or
+ * half-written save must never reach the renderer; the caller starts a new game
+ * instead.
  */
 export function isGameState(value: unknown): value is GameState {
   if (!isRecord(value)) return false;
@@ -57,9 +58,10 @@ export function isGameState(value: unknown): value is GameState {
     typeof cols !== "number" ||
     !Number.isInteger(rows) ||
     !Number.isInteger(cols) ||
-    rows !== cols ||
     rows < MIN_GRID_SIZE ||
-    rows > MAX_GRID_SIZE
+    rows > MAX_GRID_SIZE ||
+    cols < MIN_GRID_SIZE ||
+    cols > MAX_GRID_SIZE
   ) {
     return false;
   }

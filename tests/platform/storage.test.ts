@@ -32,6 +32,14 @@ describe("save schema", () => {
     expect(isGameState(state)).toBe(true);
   });
 
+  it("accepts a rectangular four-player board such as 11 by 7", () => {
+    const board = emptyBoard(11, 7);
+    setCell(board, 0, 0, cell(4, 1));
+    const state = makeState(board, { playerCount: 4 });
+
+    expect(isGameState(state)).toBe(true);
+  });
+
   it("rejects unstable, malformed, and out-of-range boards", () => {
     const unstable = emptyBoard(7, 7);
     setCell(unstable, 0, 0, cell(1, 2));

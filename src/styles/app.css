@@ -416,10 +416,6 @@ p {
   font-size: 13px;
 }
 
-.score--rail.is-active .score__name::after {
-  content: "turn";
-}
-
 /* ---------- Board ---------- */
 
 .stage {
@@ -432,7 +428,13 @@ p {
 
 .board {
   --gap: clamp(1px, 0.7vw, 6px);
-  width: min(100%, 52vh, 560px);
+  /* Size from the shorter axis so rectangular boards stay fully visible:
+     height is bounded by 52vh and width follows the row/column ratio. */
+  width: min(
+    100%,
+    calc(52vh * var(--cols, 7) / var(--rows, 7)),
+    560px
+  );
   display: grid;
   grid-template-columns: repeat(var(--cols, 7), minmax(0, 1fr));
   gap: var(--gap);
@@ -818,6 +820,44 @@ p {
   font-size: 22px;
 }
 
+/* Two steppers, one per axis, so boards such as 11 × 7 are possible. */
+.grid-size {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+
+.grid-size .stepper {
+  flex: 1 1 150px;
+  gap: 6px;
+}
+
+.grid-size .stepper__btn {
+  width: 40px;
+  height: 40px;
+  font-size: 20px;
+}
+
+.grid-size .stepper__value {
+  min-width: 2ch;
+  font-size: 20px;
+}
+
+.stepper__label {
+  color: var(--ink-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.grid-size__by {
+  color: var(--ink-muted);
+  font-family: var(--font-display);
+  font-size: 18px;
+}
+
 .player-list {
   display: grid;
   gap: 8px;
@@ -1132,7 +1172,11 @@ p {
   }
 
   .board {
-    width: min(100%, 62vh, 420px);
+    width: min(
+      100%,
+      calc(62vh * var(--cols, 7) / var(--rows, 7)),
+      420px
+    );
   }
 
   .screen--home {

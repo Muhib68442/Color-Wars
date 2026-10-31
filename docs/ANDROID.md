@@ -230,7 +230,7 @@ v1.0.
 
 | Feature | Implementation | Verification |
 | --- | --- | --- |
-| 7×7–15×15 square board, local 1–4 players | Pure engine + DOM grid | Engine tests; tap on device |
+| 7–15 rows × 7–15 columns rectangular board, local 1–4 players | Pure engine + DOM grid | Engine tests; tap on device |
 | Place on empty / own cell | `applyMove` legality | Unit tests; UI test |
 | Corner 2 / edge 3 / interior 4 | `capacityAt` | Unit tests |
 | Cascades and ownership conversion | `resolveCascades` events | Unit tests; animation replay |
@@ -303,22 +303,28 @@ Test the gesture navigation and predictive back on Android 13+.
 
 ### 6.4 Orientation and layout
 
-- Prefer `unspecified` orientation with a responsive square board:
+- Prefer `unspecified` orientation with a responsive rectangular board:
   ```css
   .board {
-    width: min(100%, 52vh, 560px);
-    aspect-ratio: 1;
+    width: min(
+      100%,
+      calc(52vh * var(--cols, 7) / var(--rows, 7)),
+      560px
+    );
     display: grid;
     grid-template-columns: repeat(var(--cols, 7), minmax(0, 1fr));
     gap: clamp(1px, 0.7vw, 6px);
   }
   ```
+  Cells are square (`aspect-ratio: 1`), so width follows the column/row ratio
+  and height stays within 52vh. This keeps 11×7 and 7×11 fully visible.
 - Touch targets must stay at least **48 dp**; scale cells with the board. At
   15×15 on a narrow phone, cells fall below 48 dp, so add a zoom/inspect
   affordance or accept the smaller visual target with a larger hit area before
   release.
 - In four-player mode, keep the P3/P4 side rails readable in portrait; they are
-  already collapsible to 48 px below 520 px.
+  one card thickness wide (`--score-thickness`, 32–40 px) so the board keeps as
+  much width as possible.
 - Do not lock orientation unless product decides to; tablets and foldables
   should work in both.
 - Test split-screen and foldable posture changes.
@@ -331,7 +337,7 @@ Test the gesture navigation and predictive back on Android 13+.
 - Cells are real `<button>`s with `aria-label` (row, column, owner, orbs).
 - Turn and win messages live in `aria-live="polite"` regions.
 - Ownership must not rely on colour alone; the web build already uses a distinct
-  orb fill/ring per player and a text "playing"/"turn" pill.
+  orb fill/ring per player and a text "playing" pill on the active card.
 - Test with TalkBack. The WebView exposes the DOM accessibility tree; semantic
   elements are required.
 - Respect `prefers-reduced-motion` for cascade animations.
@@ -557,7 +563,8 @@ available, an **armeabi-v7a** device.
 - [ ] Cold start, warm start, resume after hours.
 - [ ] Play a full game to a win; restart; play again.
 - [ ] Play 1-, 2-, 3-, and 4-player matches; confirm rails and turn order.
-- [ ] Change grid size to 15×15 and player count; start a new game; confirm.
+- [ ] Change grid rows/columns to 11×7 and 15×15, plus player count; start a new
+  game; confirm the board fits.
 - [ ] Rename players, choose colours, and verify contrast on the board.
 - [ ] Toggle sound and vibration off; confirm both stay off after relaunch.
 - [ ] Force-stop mid-game; relaunch; state restored.
