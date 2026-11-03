@@ -1,9 +1,9 @@
 # Game Algorithm
 
 This document explains the Color Wars rule system, the state it operates on,
-and the cascade algorithm. §1–§6 describe the **current** rules and TypeScript
-engine. §7–§8 are a historical record of the legacy implementations and their
-defects, kept so they are not reintroduced.
+and the cascade algorithm. §1–§7 describe the **current** rules, TypeScript
+engine, and Bot. §8–§9 are a historical record of the legacy implementations
+and their defects, kept so they are not reintroduced.
 
 ---
 
@@ -32,6 +32,7 @@ Board        = ROWS × COLS matrix, each cell is:
 playerCount   : 1 | 2 | 3 | 4
 currentPlayer : 1 | 2 | 3 | 4
 hasPlayed     : { 1..4: bool }   // opening-move bookkeeping
+botPlayer     : 1..4 | null      // seat driven by the AI, never player 1
 gameOver      : bool
 winner        : 1..4 | null
 moveCount     : int
@@ -45,6 +46,9 @@ Invariants:
   turn is considered.
 - `owner` is a single value per cell; a cell never mixes player orbs.
 - `owner` and `currentPlayer` are always within `1 … playerCount`.
+- `botPlayer` is `null` for a hot-seat match. When set, it is the
+  highest-numbered seat at the table (`2 … playerCount`); player 1 is always
+  human, and a solo board has no Bot.
 
 Capacity by position (for any rectangular board):
 
@@ -201,7 +205,106 @@ locks and the player can keep experimenting indefinitely.
 
 ---
 
-## 6. Complexity
+## 6. Bot opponent
+
+The Bot is a pure move chooser in `src/engine/bot.ts`; it never mutates the
+game state. `chooseBotMove(state, { difficulty, random? })` returns a legal
+`CellRef` or `null`, and the UI applies it through the normal `applyMove`
+pipeline after a short thinking pause. The Bot is always displayed as **Bot**
+and its name cannot be changed.
+
+All three difficulties use the same legal-move generator, so the Bot can never
+play an illegal move and therefore never needs special-case rules:
+
+- **Easy** — pick a uniformly random legal move.
+- **Medium** — apply every legal move on a clone and take the highest static
+  evaluation.
+- **Hard** — rank the same moves, keep the best handful, and reject any move
+  that lets the next opponent detonate an already armed cell.
+
+### 6.1 Static evaluation
+
+For the Bot's seat `me`, one board pass produces each player's orb and cell
+totals. The score is:
+
+```
+value(player) = orbs × 1.5 + cells × 4
+material      = value(me) − average(value(rivals))
+lead          = value(me) − max(value(rivals))
+pressure      = +1.4 per own cell at capacity−1
+                −1.8 per rival cell at capacity−1
+score         = material + 0.35 × lead + pressure
+```
+
+`cells` are weighted higher than `orbs` because territory creates future
+explosion options. The `lead` term makes the Bot care about the strongest rival
+rather than only the total opposition, and `pressure` makes a nearly full cell
+visible as both an asset and a threat.
+
+A finished game short-circuits the evaluation: a win for `me` is
+`+1_000_000`, a draw `−500_000`, and a loss `−1_000_000`, so any immediate win
+outranks every positional consideration.
+
+### 6.2 Easy
+
+```text
+moves = legalMoves(state)
+return moves[floor(random() × length)]
+```
+
+Easy is deliberately unstructured: it still makes a legal move, but it does not
+defend, build territory, or take a win unless the random choice happens to land
+on one.
+
+### 6.3 Medium
+
+```text
+best = null
+for move in legalMoves(state):
+    next = applyMove(state, move)
+    score = evaluate(next, me)
+    keep the move with the highest score
+return one of the tied best moves
+```
+
+This is a 1-ply greedy search. It takes an immediate win when one exists and
+prefers captures, material, and armed cells, but it cannot see the opponent's
+reply.
+
+### 6.4 Hard
+
+Hard starts from the same ranked list but only inspects the top eight moves. For
+each candidate it enumerates the opponent's **immediate threats**: rival-owned
+cells that are one orb below capacity, capped at sixteen, because those are the
+only replies that can resolve a detonation on the spot. It applies each reply
+and keeps the worst resulting score:
+
+```text
+for candidate in bestEight(ranked):
+    worst = candidate.score
+    for reply in immediateThreats(candidate.state):
+        worst = min(worst, evaluate(applyMove(candidate.state, reply), me))
+    keep the candidate with the highest worst-case score
+```
+
+This is a bounded 2-ply check with no general tree search. It is cheap enough
+for the 225-cell board and directly targets the common blunder of leaving a
+rival cell armed; it does not predict multi-move plans. Ties in every difficulty
+are broken with the injectable `random` function, which keeps tests
+deterministic.
+
+### 6.5 Turn ownership in the UI
+
+`GameState.botPlayer` is persisted with the save, so resuming a match restores
+the AI seat exactly. When it is the Bot's turn the board ignores input and
+removes its tab stop; after `BOT_THINK_MS` (600 ms) the controller applies the
+chosen move, plays the normal cascade events, saves, and schedules the next turn
+if the Bot still owns it. Returning from a dialog uses a shorter
+`BOT_RESUME_MS` (350 ms) delay.
+
+---
+
+## 7. Complexity
 
 Let `N = ROWS × COLS` (49–225 in the product) and `E` be the number of
 explosion events in a cascade.
@@ -214,17 +317,17 @@ explosion events in a cascade.
 | Winner check | O(N) | O(n) |
 
 The sparse list is acceptable for 49 cells but is the reason the Python version
-has a lookup-consistency bug (see §8).
+has a lookup-consistency bug (see §9).
 
 ---
 
-## 7. Legacy web implementation (`script.js`, removed)
+## 8. Legacy web implementation (`script.js`, removed)
 
 > Historical record. The current implementation is the pure TypeScript engine
 > described in §1–§5; this section documents the pre-rebuild `script.js` so its
 > defects are not reintroduced.
 
-### 7.1 What it did
+### 8.1 What it did
 
 ```
 handleCellClick(cell):
@@ -259,7 +362,7 @@ for each of the 4 directions:
     if neighbour.points < 4: break
 ```
 
-### 7.2 Defects
+### 8.2 Defects
 
 | # | Defect | Consequence |
 | --- | --- | --- |
@@ -276,12 +379,12 @@ replaced it in Phase 1–2.
 
 ---
 
-## 8. Legacy desktop implementation (`legacy/main.py`)
+## 9. Legacy desktop implementation (`legacy/main.py`)
 
 > Historical record. The Pygame prototype is archived and is not part of the
 > product.
 
-### 8.1 What it did
+### 9.1 What it did
 
 - `Coin(row, col, player, points)` objects in a flat `coins` list.
 - `increment_points()` adds one; if `points > 4`, it resets to 1 and **flips the
@@ -308,7 +411,7 @@ return whether anything exploded
 `main()` repeats `handle_explosions()` until it returns false, redrawing between
 passes.
 
-### 8.2 Defects
+### 9.2 Defects
 
 | # | Defect | Consequence |
 | --- | --- | --- |
@@ -321,7 +424,7 @@ passes.
 
 ---
 
-## 9. Reference implementation (TypeScript engine)
+## 10. Reference implementation (TypeScript engine)
 
 The shipped `applyMove` follows this shape:
 
@@ -369,9 +472,12 @@ Renderers then:
 This removes the ghost-coin class of bug entirely: the DOM or Pygame surface is
 always rebuilt from the model, never patched ad hoc.
 
+The Bot reuses the same `applyMove` (on cloned states) for every candidate and
+threat reply, so its search and the real turn can never disagree about the rules.
+
 ---
 
-## 10. Edge cases checklist
+## 11. Edge cases checklist
 
 - [ ] Corner detonation spreads to exactly 2 neighbours.
 - [ ] Edge detonation spreads to exactly 3 neighbours.
@@ -387,6 +493,10 @@ always rebuilt from the model, never patched ad hoc.
 - [ ] The turn skips a player eliminated before their next turn.
 - [ ] Unplayed players are not eliminated during the opening round.
 - [ ] Solo mode never ends and keeps the same player on turn.
+- [ ] The Bot only returns legal moves and returns `null` when none exist.
+- [ ] Easy, Medium, and Hard can choose different moves from the same position.
+- [ ] A saved Bot seat resumes and auto-plays on the Bot's turn.
+- [ ] The Bot's display name is `Bot` even if a stale profile name exists.
 - [ ] The source cell of a detonation is empty and renders empty.
 - [ ] Board and rendered output always agree after the cascade.
 - [ ] Illegal clicks (enemy cell, after game over) change nothing.

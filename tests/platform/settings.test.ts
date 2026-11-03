@@ -22,6 +22,7 @@ describe("settings defaults", () => {
     expect(settings.gridRows).toBe(7);
     expect(settings.gridCols).toBe(7);
     expect(settings.playerCount).toBe(2);
+    expect(settings.bot).toBe(false);
     expect(settings.sound).toBe(true);
     expect(settings.vibration).toBe(true);
     expect(settings.profiles[1].name).toBe("Player 1");
@@ -93,6 +94,13 @@ describe("normalizeSettings", () => {
     expect(normalizeSettings(null)).toEqual(defaultSettings());
     expect(normalizeSettings("nope")).toEqual(defaultSettings());
     expect(normalizeSettings({ profiles: "bad" })).toEqual(defaultSettings());
+  });
+
+  it("keeps a Bot only when there is an opponent seat", () => {
+    expect(normalizeSettings({ bot: true, playerCount: 2 }).bot).toBe(true);
+    expect(normalizeSettings({ bot: true, playerCount: 4 }).bot).toBe(true);
+    expect(normalizeSettings({ bot: "yes", playerCount: 2 }).bot).toBe(false);
+    expect(normalizeSettings({ bot: true, playerCount: 1 }).bot).toBe(false);
   });
 });
 

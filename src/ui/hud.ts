@@ -1,4 +1,5 @@
 import {
+  BOT_NAME,
   countCells,
   countOrbs,
   type GameState,
@@ -14,6 +15,7 @@ export interface HudRefs {
   status: HTMLElement;
   scores: Record<Player, ScoreCard>;
   getProfiles: () => Record<Player, PlayerProfile>;
+  getBotPlayer: () => Player | null;
   getTheme: () => Theme;
 }
 
@@ -24,7 +26,9 @@ export interface Hud {
 function displayName(
   profiles: Record<Player, PlayerProfile>,
   player: Player,
+  botPlayer: Player | null,
 ): string {
+  if (player === botPlayer) return BOT_NAME;
   return profiles[player].name.trim() || `Player ${player}`;
 }
 
@@ -32,13 +36,14 @@ export function createHud(refs: HudRefs): Hud {
   return {
     render(state) {
       const profiles = refs.getProfiles();
+      const botPlayer = refs.getBotPlayer();
       const dark = refs.getTheme() === "dark";
       const active = state.gameOver ? null : state.currentPlayer;
 
       for (const player of PLAYERS) {
         const score = refs.scores[player];
         const visible = player <= state.playerCount;
-        const playerName = displayName(profiles, player);
+        const playerName = displayName(profiles, player, botPlayer);
 
         score.root.hidden = !visible;
         score.root.setAttribute("aria-label", `${playerName} score`);
@@ -63,16 +68,22 @@ export function createHud(refs: HudRefs): Hud {
         refs.status.textContent =
           state.winner === null
             ? "It's a draw."
-            : `${displayName(profiles, state.winner)} wins!`;
+            : `${displayName(profiles, state.winner, botPlayer)} wins!`;
         refs.status.dataset.player =
           state.winner === null ? "" : String(state.winner);
         refs.status.classList.add("is-over");
         return;
       }
 
-      const name = displayName(profiles, state.currentPlayer);
-      refs.status.textContent =
-        state.playerCount === 1 ? `${name} · solo practice` : `${name} to move`;
+      const name = displayName(profiles, state.currentPlayer, botPlayer);
+      if (state.currentPlayer === botPlayer) {
+        refs.status.textContent = `${name} is thinking…`;
+      } else {
+        refs.status.textContent =
+          state.playerCount === 1
+            ? `${name} · solo practice`
+            : `${name} to move`;
+      }
       refs.status.dataset.player = String(state.currentPlayer);
       refs.status.classList.remove("is-over");
     },

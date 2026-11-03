@@ -994,6 +994,15 @@ p {
   outline-offset: 1px;
 }
 
+.player-row.is-bot {
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.player-row input[type="text"]:disabled {
+  color: var(--ink-muted);
+  cursor: not-allowed;
+}
+
 .switch {
   position: relative;
   display: flex;

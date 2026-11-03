@@ -1,18 +1,20 @@
 import {
+  DIFFICULTIES,
   MAX_GRID_SIZE,
   MAX_PLAYERS,
   MIN_GRID_SIZE,
   MIN_PLAYERS,
+  type Difficulty,
   type Player,
   type PlayerCount,
 } from "../engine/index.js";
 import { isRecord, type KeyValueStore } from "./storage.js";
 
 export const SETTINGS_KEY = "color-wars:settings";
-export const SETTINGS_VERSION = 3;
+export const SETTINGS_VERSION = 4;
 export const MAX_NAME_LENGTH = 16;
 
-export type Difficulty = "easy" | "medium" | "hard";
+export type { Difficulty };
 export type Theme = "light" | "dark";
 
 export interface PlayerProfile {
@@ -26,6 +28,8 @@ export interface GameSettings {
   gridRows: number;
   gridCols: number;
   playerCount: PlayerCount;
+  /** Makes the highest-numbered player an AI opponent in new games. */
+  bot: boolean;
   profiles: Record<Player, PlayerProfile>;
   sound: boolean;
   vibration: boolean;
@@ -43,7 +47,6 @@ const DEFAULT_PROFILES: Record<Player, PlayerProfile> = {
   4: { name: "Player 4", color: "#f0a12e" },
 };
 
-const DIFFICULTIES: Difficulty[] = ["easy", "medium", "hard"];
 const THEMES: Theme[] = ["light", "dark"];
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 
@@ -54,6 +57,7 @@ export function defaultSettings(): GameSettings {
     gridRows: MIN_GRID_SIZE,
     gridCols: MIN_GRID_SIZE,
     playerCount: 2,
+    bot: false,
     profiles: {
       1: { ...DEFAULT_PROFILES[1] },
       2: { ...DEFAULT_PROFILES[2] },
@@ -75,7 +79,7 @@ export function sanitizeName(value: unknown, player: Player): string {
 export function isDifficulty(value: unknown): value is Difficulty {
   return (
     typeof value === "string" &&
-    (DIFFICULTIES as string[]).includes(value)
+    (DIFFICULTIES as readonly string[]).includes(value)
   );
 }
 
@@ -122,6 +126,11 @@ export function normalizeSettings(value: unknown): GameSettings {
     defaults.playerCount,
   ) as PlayerCount;
 
+  // A solo practice board has no opponent to automate.
+  const bot =
+    playerCount > 1 &&
+    (typeof value["bot"] === "boolean" ? value["bot"] : defaults.bot);
+
   // Settings v1 stored one square `gridSize`; both axes inherit it on load.
   const legacySize = clampInt(
     value["gridSize"],
@@ -148,6 +157,7 @@ export function normalizeSettings(value: unknown): GameSettings {
       legacySize,
     ),
     playerCount,
+    bot,
     profiles,
     sound: typeof value["sound"] === "boolean" ? value["sound"] : defaults.sound,
     vibration:

@@ -13,6 +13,7 @@ import type {
   GameEvent,
   GameState,
   MoveResult,
+  Player,
   PlayerCount,
 } from "./types.js";
 
@@ -24,7 +25,13 @@ export function createGame(
   rows = 7,
   cols = 7,
   playerCount: PlayerCount = 2,
+  botPlayer: Player | null = null,
 ): GameState {
+  const seat =
+    botPlayer !== null && botPlayer > 1 && botPlayer <= playerCount
+      ? botPlayer
+      : null;
+
   return {
     rows,
     cols,
@@ -32,6 +39,7 @@ export function createGame(
     board: createBoard(rows, cols),
     currentPlayer: 1,
     hasPlayed: { 1: false, 2: false, 3: false, 4: false },
+    botPlayer: seat,
     gameOver: false,
     winner: null,
     moveCount: 0,

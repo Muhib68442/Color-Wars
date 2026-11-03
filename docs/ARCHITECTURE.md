@@ -248,10 +248,11 @@ color-wars/
 ├── src/
 │   ├── main.ts                  # bootstrap + lifecycle persistence
 │   ├── engine/                  # pure rules, no DOM, no platform APIs
-│   │   ├── types.ts             # Player, PlayerCount, Cell, Board, GameState, GameEvent
+│   │   ├── types.ts             # Player, PlayerCount, Difficulty, Cell, Board, GameState, GameEvent
 │   │   ├── board.ts             # createBoard, capacityAt, neighbours, alivePlayers, nextPlayer, counts
 │   │   ├── cascade.ts           # resolveCascades -> events[]
 │   │   ├── moves.ts             # createGame, legalMoves, applyMove
+│   │   ├── bot.ts               # BOT_NAME, chooseBotMove, difficulty search
 │   │   ├── winner.ts            # evaluateWinner
 │   │   └── index.ts             # public API
 │   ├── ui/
@@ -263,7 +264,7 @@ color-wars/
 │   │   ├── animations.ts        # consumes engine events
 │   │   └── query.ts             # required-element helper
 │   ├── platform/
-│   │   ├── storage.ts           # save schema v2, localStorage adapter
+│   │   ├── storage.ts           # save schema v3, localStorage adapter
 │   │   ├── settings.ts          # settings model, colour helpers, persistence
 │   │   ├── sound.ts             # Web Audio cues + no-op fallback
 │   │   ├── backButton.ts        # Android back handling (Phase 3)
@@ -293,12 +294,14 @@ Pygame, Capacitor, or storage.
 
 | Export | Responsibility |
 | --- | --- |
-| `createGame(rows, cols, playerCount)` | Initial `GameState` for 1–4 players; defaults to 7×7, 2 players |
+| `createGame(rows, cols, playerCount, botPlayer)` | Initial `GameState` for 1–4 players with an optional AI seat; defaults to 7×7, 2 players, no Bot |
 | `capacityAt(rows, cols, row, col)` | 2 / 3 / 4 by position |
 | `getCell` / `setCell` | Bounds-safe board access |
 | `legalMoves(state)` / `isLegalMove(state, move)` | Move validation |
 | `applyMove(state, move)` | Pure move application; returns `{ state, events, accepted }` |
 | `evaluateWinner(state)` | Multi-player elimination, draw, and solo behaviour |
+| `chooseBotMove(state, { difficulty })` | Legal move for the AI seat; Easy random, Medium greedy, Hard bounded threat check |
+| `BOT_NAME` | The fixed display name `Bot` used by the UI |
 | `alivePlayers(state)` / `nextPlayer(state)` | Survivors and turn order (skips eliminated players) |
 | `countOrbs` / `countCells` / `isStable` | Derived state and invariants |
 
@@ -329,6 +332,9 @@ type GameEvent =
   labels, and palette tokens; apply the light/dark theme to `<html>` and
   regenerate the palette for that theme; grid rows/columns and player count take
   effect on the next **New game**.
+- Detect the Bot seat from `state.botPlayer`, always render it as `Bot`, and
+  auto-play its turn through `chooseBotMove` + `applyMove` while locking board
+  input. The name field for that seat is disabled.
 - Contain **no rule logic** (no capacity checks, no winner checks).
 
 #### Platform contract
@@ -368,6 +374,7 @@ so the same build runs in a desktop browser and inside the APK.
 | 1 | pure TypeScript engine + Vitest suite (no visual change) | **done** |
 | 2 | rewrite the UI against the engine: visible turn banner, win overlay, restart, save/resume, accessibility | **done** |
 | 2.5 | home menu, settings, 1–4 players, 7–15 rows/columns, names/colours, sound and vibration toggles | **done** |
+| 2.6 | Bot opponent with Easy/Medium/Hard difficulty, fixed `Bot` name, save-resumable AI seat | **done** |
 | 3 | Capacitor shell, Android project, Preferences persistence hardening, device testing | next |
 | 4 | signing, release build, Play checklist, hardening | planned |
 
@@ -378,22 +385,25 @@ replaced them.
 #### Save and settings schemas
 
 ```
-Save     = { version: 2, savedAt: number, state: GameState }
-Settings = { version: 3, settings: GameSettings }
+Save     = { version: 3, savedAt: number, state: GameState }
+Settings = { version: 4, settings: GameSettings }
 ```
 
 `GameSettings` stores `theme` (`light` or `dark`), `gridRows` and `gridCols`
-separately (each 7–15). Version-1 settings that used a single square `gridSize`
-are normalized onto both axes on load; settings without a valid theme (v1/v2)
-default to light. The theme is applied to `<html data-theme="…">`, and a small
-inline script in `index.html` reads the saved value before first paint.
+separately (each 7–15), and a `bot` flag that gives the highest-numbered seat to
+the AI. Version-1 settings that used a single square `gridSize` are normalized
+onto both axes on load; settings without a valid theme (v1/v2) default to light;
+settings without `bot` (v1–v3) default it to off. The theme is applied to
+`<html data-theme="…">`, and a small inline script in `index.html` reads the
+saved value before first paint.
 
-`SAVE_VERSION = 2` covers the multi-player, variable-grid state shape
-(`playerCount`, `hasPlayed` for 1–4). Version-1 saves are rejected by
-`parseSave` and removed from the store, so an older save can never half-load
-into the new renderer. Phase 3 migrates the same payloads to
-`@capacitor/preferences`; a migration hook can map v1 → v2 there if resuming
-old games becomes a requirement.
+`SAVE_VERSION = 3` adds `GameState.botPlayer` to the multi-player,
+variable-grid state shape. `parseSave` accepts version 2 and migrates it with
+`botPlayer: null`, so an existing hot-seat save resumes unchanged. Version-1
+saves are rejected by `parseSave` and removed from the store, so an older save
+can never half-load into the new renderer. Phase 3 migrates the same payloads
+to `@capacitor/preferences`; a migration hook can map v1 → v2 → v3 there if
+resuming old games becomes a requirement.
 
 ### 4.5 Android packaging
 
@@ -410,8 +420,9 @@ Studio 2025.2.1+, fully offline assets, no runtime permissions required.
   position.
 - **Players:** done — 1–4 players via `Player`/`PlayerCount`, `hasPlayed`, and
   `nextPlayer` turn rotation.
-- **AI:** the engine's `legalMoves` + `applyMove` supports minimax/MCTS. The
-  Difficulty setting is already persisted and reserved for this.
+- **AI:** done — `src/engine/bot.ts` exposes `chooseBotMove` over
+  `legalMoves` + `applyMove`, with Easy, Medium, and Hard difficulty; the Bot
+  seat is stored in `GameState.botPlayer` and persisted.
 - **Undo:** snapshot the state before each move.
 - **Network play:** serialise `applyMove` inputs or event streams.
 - **Persistence:** store the board as a compact string (`0`–`4` plus orb
@@ -427,7 +438,7 @@ Studio 2025.2.1+, fully offline assets, no runtime permissions required.
 ## 6. Testing strategy
 
 The engine is tested with **Vitest** (`npm test`), independently of the DOM and
-of Capacitor. The suite currently has **93 tests across 8 files**.
+of Capacitor. The suite currently has **116 tests across 9 files**.
 
 1. **Board and capacity** (`tests/engine/board.test.ts`)
    - corners 2, edges 3, interior 4;
@@ -459,18 +470,29 @@ of Capacitor. The suite currently has **93 tests across 8 files**.
    - invariant checks after every move (owner valid, orbs positive, board
      stable unless a cascade limit was hit);
    - pathological cascades terminate through the step cap.
-6. **Storage and settings** (`tests/platform/`)
-   - save round-trip, corrupt-save rejection, v1 rejection, four-player 15×15
-     round-trip, unstable-board refusal;
-   - settings defaults, clamping, theme validation and migration, name/colour
-     sanitisation, colour blending, persistence, and corrupt-data fallback.
-7. **UI tests** (`tests/ui/app.test.ts`, jsdom)
+6. **Bot** (`tests/engine/bot.test.ts`)
+   - the Bot seat defaults to null and is normalised to the highest seat;
+   - every difficulty returns a legal move or null;
+   - Easy samples uniformly from the legal move list;
+   - Medium and Hard take an immediate win;
+   - Hard rejects the greedy move when it leaves an opponent's armed cell, and
+     keeps more orbs after the opponent's best reply.
+7. **Storage and settings** (`tests/platform/`)
+   - save round-trip, corrupt-save rejection, v1 rejection, v2 → v3 migration,
+     four-player 15×15 round-trip, Bot-seat validation, unstable-board refusal;
+   - settings defaults, clamping, Bot normalisation, theme validation and
+     migration, name/colour sanitisation, colour blending, persistence, and
+     corrupt-data fallback.
+8. **UI tests** (`tests/ui/app.test.ts`, jsdom)
    - the home screen gates the match and all five actions exist;
    - **New game** clears the save, **Resume** restores an unfinished match;
-   - settings change theme/grid/player count/names/colours/sound/vibration and
-     persist across a reload; the theme applies to the document root;
+   - settings change theme/grid/player count/Bot/difficulty/names/colours/sound/
+     vibration and persist across a reload; the theme applies to the document
+     root;
+   - the Bot seat is named `Bot`, cannot be renamed, auto-plays after the human
+     move, and resumes from a saved Bot turn;
    - four-player layout order (`3`, `2`, `board`, `1`, `4`) and hidden rails;
    - placing, capturing, focus movement, win overlay, and input locking;
    - solo status.
-8. **Device tests (Phase 3–4)** — see the matrix in
+9. **Device tests (Phase 3–4)** — see the matrix in
    [`ANDROID.md`](ANDROID.md#testing-matrix).

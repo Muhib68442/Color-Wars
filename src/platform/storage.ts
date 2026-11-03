@@ -9,7 +9,9 @@ import {
 } from "../engine/index.js";
 
 export const SAVE_KEY = "color-wars:save";
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
+/** Version 2 saves are accepted and migrated with no Bot seat. */
+export const MIN_SAVE_VERSION = 2;
 
 export interface KeyValueStore {
   getItem(key: string): string | null;
@@ -109,6 +111,13 @@ export function isGameState(value: unknown): value is GameState {
 
   if (typeof value["gameOver"] !== "boolean") return false;
 
+  const botPlayer = value["botPlayer"];
+  if (botPlayer !== null) {
+    if (!isPlayerInRange(botPlayer, playerCount)) return false;
+    // Player 1 is always the human, and a Bot needs a second seat.
+    if (botPlayer < 2) return false;
+  }
+
   const winner = value["winner"];
   if (winner !== null && !isPlayerInRange(winner, playerCount)) return false;
 
@@ -136,9 +145,20 @@ export function parseSave(raw: string): GameState | null {
   }
 
   if (!isRecord(parsed)) return null;
-  if (parsed["version"] !== SAVE_VERSION) return null;
+  const version = parsed["version"];
+  if (
+    version !== SAVE_VERSION &&
+    version !== MIN_SAVE_VERSION
+  ) {
+    return null;
+  }
 
-  const state = parsed["state"];
+  const stored = parsed["state"];
+  if (!isRecord(stored)) return null;
+
+  // Version 2 had no Bot seat; migrate it to a plain hot-seat match.
+  const state =
+    version === MIN_SAVE_VERSION ? { ...stored, botPlayer: null } : stored;
   if (!isGameState(state)) return null;
 
   return state;

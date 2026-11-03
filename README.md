@@ -4,16 +4,17 @@ A local **Chain Reaction**–style game for **one to four players** on a
 rectangular grid with **7–15 rows and 7–15 columns** (for example 11×7 or
 15×15). Click a cell to add an orb; a cell that reaches its capacity explodes
 and sends one orb to each orthogonal neighbour, converting enemy orbs along the
-way. The last player with orbs on the board wins.
+way. The last player with orbs on the board wins. Play hot-seat on one device,
+solo, or against an optional **Bot** with Easy, Medium, and Hard difficulty.
 
 The **web implementation is the product**. It will ship as an Android app built
 with Capacitor (see [`docs/ANDROID.md`](docs/ANDROID.md)). The Pygame prototype
 in `legacy/main.py` is archived for reference and is no longer maintained.
 
 > **Status: playable web build.** The pure engine, home/menu flow, settings,
-> light/dark themes, multi-player boards, and save/resume are complete and
-> covered by 93 Vitest tests. Phase 3 wraps the Vite build in a Capacitor
-> Android shell; Phase 4 handles signing and release. See the
+> light/dark themes, multi-player boards, save/resume, and the Bot opponent are
+> complete and covered by 116 Vitest tests. Phase 3 wraps the Vite build in a
+> Capacitor Android shell; Phase 4 handles signing and release. See the
 > [roadmap](#roadmap).
 
 ---
@@ -41,9 +42,10 @@ work happens on the web/Android build.
 
 ## How to play
 
-- **Everyone shares one device** (hot-seat). Player 1 sits at the bottom,
-  Player 2 at the top, and Players 3 and 4 on the left and right for
-  four-player matches.
+- **Everyone shares one device** (hot-seat), or an optional **Bot** plays the
+  last seat. Player 1 sits at the bottom, Player 2 at the top, and Players 3 and
+  4 on the left and right for four-player matches. The Bot is always named
+  `Bot` and cannot be renamed.
 - On a turn, either place a new orb on **any empty cell** or add one orb to a
   cell you already own.
 - A cell explodes when it reaches its capacity: **2 in a corner, 3 on an edge,
@@ -59,10 +61,12 @@ and **About**, plus **Resume** when an unfinished saved match exists.
 - **Resume** restores an unfinished saved match. It only appears when such a
   save exists; with no save, or after a finished match, the button is hidden.
 - **New game** starts a fresh match and discards any previous save.
-- **Settings** controls the light/dark theme, difficulty (UI placeholder for the
-  future bot), grid rows and columns, number of players, per-player names and
-  colours, sound, and vibration. Changes are saved immediately; the theme also
-  applies on the next launch without a light flash.
+- **Settings** controls the light/dark theme, the Bot opponent and its
+  Easy/Medium/Hard difficulty, grid rows and columns, number of players,
+  per-player names and colours, sound, and vibration. Changes are saved
+  immediately; the theme also applies on the next launch without a light flash.
+  Difficulty changes how the Bot searches for a move; Easy is random, Medium is
+  one-ply greedy, and Hard also avoids leaving an immediate detonation.
 - The in-match menu offers How to play, Restart, and Back to home. When the game
   ends, a result dialog appears and the board is locked until you start again.
 
@@ -78,12 +82,12 @@ Color Wars/
 ├── font.ttf            # Custom display font
 ├── src/
 │   ├── main.ts         # Bootstrap and lifecycle persistence
-│   ├── engine/         # Pure rules: types, board, cascade, moves, winner
+│   ├── engine/         # Pure rules: types, board, cascade, moves, bot, winner
 │   ├── ui/             # shell, board, HUD, overlay, animations, controller
 │   ├── platform/       # storage, settings, sound, and haptics adapters
 │   └── styles/         # tokens.css and app.css
 ├── tests/
-│   ├── engine/         # board, moves, cascades, winner, stress
+│   ├── engine/         # board, moves, cascades, winner, bot, stress
 │   ├── platform/       # save schema, settings, and storage adapters
 │   └── ui/             # jsdom app tests
 ├── android/            # Phase 3 target: Capacitor Android project
@@ -172,6 +176,7 @@ regression coverage in the test suite.
 | 1 | pure TypeScript engine (`src/engine/`) + Vitest suite, no visual change | done |
 | 2 | rebuild the UI on the engine: visible turn banner, win overlay, restart, save/resume, accessibility | done |
 | 2.5 | home menu, settings, light/dark themes, 1–4 players, dynamic grids, names/colours, sound and vibration toggles | done |
+| 2.6 | Bot opponent with Easy/Medium/Hard difficulty, fixed `Bot` name, save-resumable AI seat | done |
 | 3 | Capacitor 8 shell, Android project, Preferences persistence hardening, device matrix | next |
 | 4 | signing, release build, Play checklist, hardening | planned |
 

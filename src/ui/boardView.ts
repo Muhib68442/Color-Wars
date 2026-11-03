@@ -1,4 +1,5 @@
 import {
+  BOT_NAME,
   capacityAt,
   isLegalMove,
   type CellRef,
@@ -19,6 +20,10 @@ interface CellView {
 
 export interface BoardViewOptions {
   getProfiles: () => Record<Player, PlayerProfile>;
+  /** The AI seat, if any, so its label never uses a player profile name. */
+  getBotPlayer?: () => Player | null;
+  /** True while the Bot is thinking; no human input is accepted. */
+  isInputLocked?: () => boolean;
 }
 
 export interface BoardView {
@@ -51,6 +56,7 @@ function clamp(value: number, min: number, max: number): number {
 function labelFor(
   state: GameState,
   profiles: Record<Player, PlayerProfile>,
+  botPlayer: Player | null,
   row: number,
   col: number,
   orbs: number,
@@ -63,7 +69,10 @@ function labelFor(
     return `${position}, empty`;
   }
 
-  const name = profiles[cell.owner].name.trim() || `Player ${cell.owner}`;
+  const name =
+    cell.owner === botPlayer
+      ? BOT_NAME
+      : profiles[cell.owner].name.trim() || `Player ${cell.owner}`;
   return `${position}, ${name}, ${orbs} of ${capacity} orbs`;
 }
 
@@ -129,13 +138,13 @@ export function createBoardView(
     return null;
   }
 
-  function applyTabStops(active: CellRef): void {
+  function applyTabStops(active: CellRef, locked = false): void {
     for (let row = 0; row < rows; row += 1) {
       for (let col = 0; col < cols; col += 1) {
         const node = cellAt(row, col);
         if (node === undefined) continue;
         node.button.tabIndex =
-          row === active.row && col === active.col ? 0 : -1;
+          !locked && row === active.row && col === active.col ? 0 : -1;
       }
     }
   }
@@ -155,6 +164,10 @@ export function createBoardView(
       if (fallback !== null) roving = fallback;
     }
 
+    const profiles = options.getProfiles();
+    const botPlayer = options.getBotPlayer?.() ?? null;
+    const locked = options.isInputLocked?.() ?? false;
+
     for (let row = 0; row < state.rows; row += 1) {
       for (let col = 0; col < state.cols; col += 1) {
         const node = cellAt(row, col);
@@ -162,19 +175,24 @@ export function createBoardView(
 
         const cell = state.board[row]?.[col] ?? null;
         const capacity = capacityAt(state.rows, state.cols, row, col);
-        const legal = isLegal(state, { row, col });
+        const legal = !locked && isLegal(state, { row, col });
         const orbs = cell?.orbs ?? 0;
-        const profiles = options.getProfiles();
         const profile = cell === null ? null : profiles[cell.owner];
+        const name =
+          cell === null
+            ? ""
+            : cell.owner === botPlayer
+              ? BOT_NAME
+              : profile?.name ?? `Player ${cell.owner}`;
 
         node.button.dataset.orbs = String(orbs);
         node.button.dataset.capacity = String(capacity);
         node.button.title = cell
-          ? `${profile?.name ?? `Player ${cell.owner}`}: ${orbs} / ${capacity} orbs`
+          ? `${name}: ${orbs} / ${capacity} orbs`
           : "Empty cell";
         node.button.setAttribute(
           "aria-label",
-          labelFor(state, profiles, row, col, orbs, capacity),
+          labelFor(state, profiles, botPlayer, row, col, orbs, capacity),
         );
 
         if (profile === null) {
@@ -208,18 +226,19 @@ export function createBoardView(
       }
     }
 
-    applyTabStops(roving);
+    applyTabStops(roving, locked);
   }
 
   function focusCell(ref: CellRef): void {
     const node = cellAt(ref.row, ref.col);
     if (node === undefined) return;
     roving = { row: ref.row, col: ref.col };
-    applyTabStops(roving);
+    applyTabStops(roving, options.isInputLocked?.() ?? false);
     node.button.focus();
   }
 
   function focusDefault(): void {
+    if (options.isInputLocked?.() ?? false) return;
     if (lastState !== null) {
       const legal = firstLegal(lastState);
       if (legal !== null) {
@@ -231,6 +250,7 @@ export function createBoardView(
   }
 
   element.addEventListener("click", (event) => {
+    if (options.isInputLocked?.() ?? false) return;
     const target = event.target;
     if (!(target instanceof Element)) return;
 
@@ -245,6 +265,7 @@ export function createBoardView(
   });
 
   element.addEventListener("keydown", (event) => {
+    if (options.isInputLocked?.() ?? false) return;
     if (!ARROW_KEYS.has(event.key)) return;
 
     const target = event.target;

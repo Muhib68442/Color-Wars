@@ -22,6 +22,7 @@ export interface StateOptions {
   playerCount?: PlayerCount;
   moveCount?: number;
   cascadeLimitReached?: boolean;
+  botPlayer?: Player | null;
 }
 
 export function makeState(board: Board, options: StateOptions = {}): GameState {
@@ -43,6 +44,7 @@ export function makeState(board: Board, options: StateOptions = {}): GameState {
     board,
     currentPlayer: options.currentPlayer ?? 1,
     hasPlayed,
+    botPlayer: options.botPlayer ?? null,
     gameOver: options.gameOver ?? false,
     winner: options.winner ?? null,
     moveCount: options.moveCount ?? 0,

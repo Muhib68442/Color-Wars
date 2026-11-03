@@ -12,12 +12,16 @@ export interface PlayerRowRefs {
   root: HTMLElement;
   color: HTMLInputElement;
   name: HTMLInputElement;
+  label: HTMLElement;
 }
 
 export interface SettingsRefs {
   difficultyButtons: HTMLButtonElement[];
+  difficultyBadge: HTMLElement;
   themeButtons: HTMLButtonElement[];
   playerCountButtons: HTMLButtonElement[];
+  bot: HTMLInputElement;
+  botHint: HTMLElement;
   gridRowsValue: HTMLElement;
   gridRowsMinus: HTMLButtonElement;
   gridRowsPlus: HTMLButtonElement;
@@ -113,7 +117,7 @@ function playerRow(player: Player): string {
         aria-label="Player ${player} colour"
       />
       <label class="player-row__name">
-        <span class="player-row__label">Player ${player}</span>
+        <span class="player-row__label" data-role="player-label">Player ${player}</span>
         <input
           type="text"
           data-role="player-name"
@@ -200,8 +204,9 @@ const SHELL_TEMPLATE = /* html */ `
     <div class="info">
       <p class="info__lead">
         Color Wars is a hot-seat game for one to four players sharing one
-        device. Player 2 sits above the board, Player 1 below it, and Players 3
-        and 4 on the left and right when four are playing.
+        device, with an optional Bot opponent. Player 2 sits above the board,
+        Player 1 below it, and Players 3 and 4 on the left and right when four
+        are playing.
       </p>
 
       <h3>Goal</h3>
@@ -234,6 +239,14 @@ const SHELL_TEMPLATE = /* html */ `
         After a cascade settles, a player with no orbs left is eliminated. If
         one player still owns orbs, they win. Solo mode is a practice board with
         no opponent.
+      </p>
+
+      <h3>Bot opponent</h3>
+      <p>
+        Turn on Bot opponent in Settings to give the last seat to the Bot. Its
+        name is always Bot, and the Difficulty setting changes how it chooses
+        moves: Easy plays at random, Medium weighs each move, and Hard also
+        avoids leaving you an immediate detonation.
       </p>
 
       <h3>Controls</h3>
@@ -285,7 +298,7 @@ const SHELL_TEMPLATE = /* html */ `
         <div class="field">
           <div class="field__head">
             <span class="field__label">Difficulty</span>
-            <span class="badge">Bot · soon</span>
+            <span class="badge" data-role="difficulty-badge">Bot · Medium</span>
           </div>
           <div class="segmented" data-role="difficulty" role="group" aria-label="Difficulty">
             <button type="button" data-difficulty="easy" aria-pressed="false">Easy</button>
@@ -293,8 +306,8 @@ const SHELL_TEMPLATE = /* html */ `
             <button type="button" data-difficulty="hard" aria-pressed="false">Hard</button>
           </div>
           <p class="field__hint">
-            Difficulty will drive the solo bot in a later phase. The choice is
-            saved now.
+            Sets how the Bot plays. It applies to the Bot's next turn and to
+            every new game.
           </p>
         </div>
 
@@ -336,9 +349,21 @@ const SHELL_TEMPLATE = /* html */ `
             <button type="button" data-count="4" aria-pressed="false">4</button>
           </div>
           <p class="field__hint">
-            Players 3 and 4 appear on the left and right of the board.
+            Players 3 and 4 appear on the left and right of the board. A solo
+            game is a practice board.
           </p>
         </div>
+
+        <label class="switch">
+          <span class="switch__copy">
+            <span class="switch__title">Bot opponent</span>
+            <span class="switch__hint" data-role="bot-hint">
+              Player 2 is played by the Bot.
+            </span>
+          </span>
+          <input type="checkbox" data-setting="bot" />
+          <span class="switch__track" aria-hidden="true"></span>
+        </label>
 
         <div class="player-list" data-role="player-list">
           ${[1, 2, 3, 4].map((value) => playerRow(value as Player)).join("")}
@@ -457,6 +482,7 @@ function playerRowRefs(root: HTMLElement, player: Player): PlayerRowRefs {
     root: row,
     color: requireElement<HTMLInputElement>(row, "[data-role='player-color']"),
     name: requireElement<HTMLInputElement>(row, "[data-role='player-name']"),
+    label: requireElement<HTMLElement>(row, "[data-role='player-label']"),
   };
 }
 
@@ -518,12 +544,18 @@ export function mountShell(root: HTMLElement): Shell {
       difficultyButtons: Array.from(
         root.querySelectorAll<HTMLButtonElement>("[data-difficulty]"),
       ),
+      difficultyBadge: requireElement<HTMLElement>(
+        root,
+        "[data-role='difficulty-badge']",
+      ),
       themeButtons: Array.from(
         root.querySelectorAll<HTMLButtonElement>("[data-theme-option]"),
       ),
       playerCountButtons: Array.from(
         root.querySelectorAll<HTMLButtonElement>("[data-count]"),
       ),
+      bot: requireElement<HTMLInputElement>(root, "[data-setting='bot']"),
+      botHint: requireElement<HTMLElement>(root, "[data-role='bot-hint']"),
       gridRowsValue: requireElement<HTMLElement>(
         root,
         "[data-role='grid-rows-value']",

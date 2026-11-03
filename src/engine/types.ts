@@ -6,6 +6,9 @@ export const MAX_PLAYERS = 4;
 export type Player = 1 | 2 | 3 | 4;
 export type PlayerCount = 1 | 2 | 3 | 4;
 
+export const DIFFICULTIES = ["easy", "medium", "hard"] as const;
+export type Difficulty = (typeof DIFFICULTIES)[number];
+
 export interface Cell {
   owner: Player;
   orbs: number;
@@ -25,6 +28,8 @@ export interface GameState {
   board: Board;
   currentPlayer: Player;
   hasPlayed: Record<Player, boolean>;
+  /** The seat controlled by the AI, or null for a hot-seat match. */
+  botPlayer: Player | null;
   gameOver: boolean;
   winner: Player | null;
   moveCount: number;

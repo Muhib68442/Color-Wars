@@ -1,5 +1,7 @@
 import {
   applyMove,
+  BOT_NAME,
+  chooseBotMove,
   createGame,
   MAX_GRID_SIZE,
   MIN_GRID_SIZE,
@@ -27,6 +29,9 @@ import { mountShell } from "./shell.js";
 export type ScreenName = "home" | "game" | "info" | "settings" | "about";
 
 const PLAYERS: Player[] = [1, 2, 3, 4];
+/** A short pause makes the Bot feel deliberate and lets the last cascade play. */
+const BOT_THINK_MS = 600;
+const BOT_RESUME_MS = 350;
 
 export interface AppOptions {
   storage: StorageAdapter;
@@ -54,9 +59,15 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
   let hasSave = loaded !== null;
   let state =
     loaded ??
-    createGame(settings.gridRows, settings.gridCols, settings.playerCount);
+    createGame(
+      settings.gridRows,
+      settings.gridCols,
+      settings.playerCount,
+      botSeatForSettings(),
+    );
   let screen: ScreenName = "home";
   let infoReturn: "home" | "game" = "home";
+  let botTimer: ReturnType<typeof setTimeout> | null = null;
 
   const profiles = () => settings.profiles;
 
@@ -65,21 +76,90 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
     (ref) => {
       selectCell(ref);
     },
-    { getProfiles: profiles },
+    {
+      getProfiles: profiles,
+      getBotPlayer: () => state.botPlayer,
+      isInputLocked: isBotTurn,
+    },
   );
 
   const hud = createHud({
     status: shell.status,
     scores: shell.scores,
     getProfiles: profiles,
+    getBotPlayer: () => state.botPlayer,
     getTheme: () => settings.theme,
   });
 
   const overlay = createOverlay(shell.overlay, () => {
-    if (screen === "game") board.focusDefault();
+    if (screen !== "game") return;
+    if (isBotTurn()) {
+      shell.menuButton.focus();
+      scheduleBotMove(150);
+      return;
+    }
+    board.focusDefault();
   });
 
+  /** The Bot always takes the highest-numbered seat in a new match. */
+  function botSeatForSettings(): Player | null {
+    return settings.bot && settings.playerCount > 1
+      ? (settings.playerCount as Player)
+      : null;
+  }
+
+  function isBotTurn(): boolean {
+    return (
+      state.botPlayer !== null &&
+      !state.gameOver &&
+      state.currentPlayer === state.botPlayer
+    );
+  }
+
+  function clearBotTimer(): void {
+    if (botTimer === null) return;
+    clearTimeout(botTimer);
+    botTimer = null;
+  }
+
+  function scheduleBotMove(delay = BOT_THINK_MS): void {
+    clearBotTimer();
+    if (!isBotTurn() || screen !== "game" || overlay.isOpen()) return;
+
+    botTimer = setTimeout(() => {
+      botTimer = null;
+      if (!isBotTurn() || screen !== "game" || overlay.isOpen()) return;
+      playBotMove();
+    }, delay);
+  }
+
+  function playBotMove(): void {
+    const move = chooseBotMove(state, { difficulty: settings.difficulty });
+    if (move === null) return;
+
+    const result = applyMove(state, move);
+    if (!result.accepted) return;
+
+    state = result.state;
+    hasSave = true;
+    render();
+    playEvents(result.events, board);
+    playMoveSound(
+      state.gameOver,
+      result.events.some((event) => event.type === "explode"),
+    );
+    storage.save(state);
+
+    if (state.gameOver) {
+      showResult();
+      return;
+    }
+
+    scheduleBotMove();
+  }
+
   function nameOf(player: Player): string {
+    if (state.botPlayer === player) return BOT_NAME;
     return settings.profiles[player].name.trim() || `Player ${player}`;
   }
 
@@ -112,8 +192,15 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
     }
   }
 
+  function difficultyLabel(value: GameSettings["difficulty"]): string {
+    return value.charAt(0).toUpperCase() + value.slice(1);
+  }
+
   function playerSummary(count: number): string {
     if (count === 1) return "1 player · solo practice";
+    if (settings.bot) {
+      return `${count} players · Bot (${difficultyLabel(settings.difficulty)})`;
+    }
     return `${count} players`;
   }
 
@@ -159,6 +246,8 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
     shell.settings.hidden = next !== "settings";
     shell.about.hidden = next !== "about";
 
+    if (next !== "game") clearBotTimer();
+
     if (next === "home") {
       if (!shell.resumeButton.disabled) shell.resumeButton.focus();
       else shell.newGameButton.focus();
@@ -168,6 +257,9 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
       shell.settingsBack.focus();
     } else if (next === "about") {
       shell.aboutBack.focus();
+    } else if (isBotTurn()) {
+      shell.menuButton.focus();
+      scheduleBotMove(BOT_RESUME_MS);
     } else {
       board.focusDefault();
     }
@@ -198,6 +290,15 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
       button.setAttribute("aria-pressed", active ? "true" : "false");
     }
 
+    refs.difficultyBadge.textContent =
+      `Bot · ${difficultyLabel(settings.difficulty)}`;
+
+    refs.bot.checked = settings.bot;
+    refs.botHint.textContent =
+      settings.bot && settings.playerCount > 1
+        ? `Player ${settings.playerCount} is the Bot. It cannot be renamed.`
+        : "Turn on to let the Bot play as the last player in new games.";
+
     refs.gridRowsValue.textContent = String(settings.gridRows);
     refs.gridRowsMinus.disabled = settings.gridRows <= MIN_GRID_SIZE;
     refs.gridRowsPlus.disabled = settings.gridRows >= MAX_GRID_SIZE;
@@ -206,12 +307,21 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
     refs.gridColsMinus.disabled = settings.gridCols <= MIN_GRID_SIZE;
     refs.gridColsPlus.disabled = settings.gridCols >= MAX_GRID_SIZE;
 
+    const botSeat = settings.bot ? (settings.playerCount as Player) : null;
+
     for (const player of PLAYERS) {
       const row = refs.playerRows[player];
       const profile = settings.profiles[player];
+      const isBot = player === botSeat;
       row.root.hidden = player > settings.playerCount;
+      row.root.classList.toggle("is-bot", isBot);
+      const label = isBot ? BOT_NAME : `Player ${player}`;
+      row.label.textContent = label;
       row.color.value = profile.color;
-      row.name.value = profile.name;
+      row.color.setAttribute("aria-label", `${label} colour`);
+      row.name.value = isBot ? BOT_NAME : profile.name;
+      row.name.setAttribute("aria-label", `${label} name`);
+      row.name.disabled = isBot;
     }
 
     refs.sound.checked = settings.sound;
@@ -267,6 +377,7 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
 
   function selectCell(ref: CellRef): boolean {
     if (screen !== "game" || overlay.isOpen()) return false;
+    if (isBotTurn()) return false;
 
     const result = applyMove(state, ref);
 
@@ -288,15 +399,18 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
     storage.save(state);
 
     if (state.gameOver) showResult();
+    else scheduleBotMove();
     return true;
   }
 
   function newGame(): void {
+    clearBotTimer();
     overlay.close();
     state = createGame(
       settings.gridRows,
       settings.gridCols,
       settings.playerCount,
+      botSeatForSettings(),
     );
     hasSave = false;
     storage.clear();
@@ -340,12 +454,15 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
   }
 
   function openMenu(): void {
+    clearBotTimer();
     overlay.open({
       eyebrow: "Game menu",
       title: "Paused",
       body: state.gameOver
         ? "The game is over. Start a new one or return home."
-        : `${nameOf(state.currentPlayer)} to move.`,
+        : isBotTurn()
+          ? `${BOT_NAME} is thinking…`
+          : `${nameOf(state.currentPlayer)} to move.`,
       actions: [
         {
           label: "Keep playing",
@@ -424,6 +541,7 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
       settings.difficulty = value;
       saveSettings();
       populateSettings();
+      updateHome();
     });
   }
 
@@ -446,11 +564,24 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
       const value = Number(button.dataset.count);
       if (value < 1 || value > 4 || !Number.isInteger(value)) return;
       settings.playerCount = value as PlayerCount;
+      // A solo practice board has no opponent for the Bot to play.
+      if (settings.playerCount === 1) settings.bot = false;
       saveSettings();
       populateSettings();
       updateHome();
     });
   }
+
+  shell.settingsRefs.bot.addEventListener("change", () => {
+    settings.bot = shell.settingsRefs.bot.checked;
+    // A Bot needs an opponent, so enabling it moves the match to two players.
+    if (settings.bot && settings.playerCount === 1) {
+      settings.playerCount = 2;
+    }
+    saveSettings();
+    populateSettings();
+    updateHome();
+  });
 
   shell.settingsRefs.gridRowsMinus.addEventListener("click", () =>
     changeGridAxis("rows", -1),
@@ -476,12 +607,21 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
     });
 
     row.name.addEventListener("input", () => {
+      // The Bot's name is fixed, so its input is disabled and ignored.
+      if (player === botSeatForSettings()) {
+        row.name.value = BOT_NAME;
+        return;
+      }
       settings.profiles[player].name = row.name.value.slice(0, 16);
       saveSettings();
       render();
     });
 
     row.name.addEventListener("blur", () => {
+      if (player === botSeatForSettings()) {
+        row.name.value = BOT_NAME;
+        return;
+      }
       const trimmed = row.name.value.trim();
       if (trimmed.length === 0) {
         settings.profiles[player].name = `Player ${player}`;
@@ -508,11 +648,14 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
     saveSettings();
     applyPalette();
     populateSettings();
+    updateHome();
     render();
   });
 
   applyTheme();
   applyPalette();
+  populateSettings();
+  updateHome();
   render();
   showScreen("home");
 

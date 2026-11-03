@@ -24,6 +24,19 @@ describe("save schema", () => {
     expect(isGameState(startedGame())).toBe(true);
   });
 
+  it("accepts a game with a Bot seat and rejects an invalid one", () => {
+    const board = emptyBoard(7, 7);
+    setCell(board, 0, 0, cell(2, 1));
+    const botGame = makeState(board, { botPlayer: 2, currentPlayer: 2 });
+
+    expect(isGameState(botGame)).toBe(true);
+    expect(isGameState({ ...botGame, botPlayer: 3 } as never)).toBe(false);
+    expect(isGameState({ ...botGame, botPlayer: 1 } as never)).toBe(false);
+    expect(
+      isGameState({ ...botGame, playerCount: 1, botPlayer: 2 } as never),
+    ).toBe(false);
+  });
+
   it("accepts a four-player game on the largest grid", () => {
     const board = emptyBoard(MAX_GRID_SIZE, MAX_GRID_SIZE);
     setCell(board, 0, 0, cell(4, 1));
@@ -91,6 +104,20 @@ describe("save schema", () => {
     expect(parseSave(payload)).toBeNull();
   });
 
+  it("migrates a version-2 save by adding a null Bot seat", () => {
+    const { botPlayer: _ignored, ...legacy } = startedGame();
+    const payload = JSON.stringify({
+      version: 2,
+      savedAt: 0,
+      state: legacy,
+    });
+
+    const parsed = parseSave(payload);
+
+    expect(parsed).not.toBeNull();
+    expect(parsed?.botPlayer).toBeNull();
+  });
+
   it("rejects a different new version", () => {
     const payload = JSON.stringify({
       version: SAVE_VERSION + 1,
@@ -126,6 +153,36 @@ describe("storage adapter", () => {
     storage.save(state);
 
     expect(storage.load()).toEqual(state);
+  });
+
+  it("round-trips a game with a Bot seat", () => {
+    const store = memoryStore();
+    const storage = createStorage(store);
+    const board = emptyBoard(7, 7);
+    setCell(board, 0, 0, cell(2, 1));
+    const state = makeState(board, {
+      botPlayer: 2,
+      currentPlayer: 2,
+    });
+
+    storage.save(state);
+
+    expect(storage.load()).toEqual(state);
+  });
+
+  it("loads a legacy version-2 save written to the store", () => {
+    const store = memoryStore();
+    const { botPlayer: _ignored, ...legacy } = startedGame();
+    store.setItem(
+      SAVE_KEY,
+      JSON.stringify({ version: 2, savedAt: 0, state: legacy }),
+    );
+    const storage = createStorage(store);
+
+    const loaded = storage.load();
+
+    expect(loaded).not.toBeNull();
+    expect(loaded?.botPlayer).toBeNull();
   });
 
   it("clears the save", () => {

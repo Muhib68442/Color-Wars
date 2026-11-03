@@ -18,7 +18,7 @@ dialog. Only one screen is visible at a time (`hidden` attribute).
 | --- | --- | --- |
 | **Home** | Branding and the five top-level actions | Launch, Back to home |
 | **Match** | The board, one score card per active player, and turn status | **Resume**, **New game** |
-| **Settings** | Theme, grid, player count, names, colours, sound, vibration, difficulty | Home **Settings** |
+| **Settings** | Theme, grid, player count, Bot opponent and difficulty, names, colours, sound, vibration | Home **Settings** |
 | **How to play** | Rules, controls, and tips | Home **How to play**, in-match menu |
 | **About** | Version, privacy, and credits | Home **About** |
 | **Dialog** | Result, restart confirmation, game menu | Game events, menu button |
@@ -101,6 +101,8 @@ With 3 players the right rail stays empty; with 2 players both rails are
 `hidden`.
 
 - **Player 2 is always above the board; Player 1 is always below it.**
+- With **Bot opponent** on, the highest-numbered active seat shows `Bot` and
+  plays automatically on its turn; the other seats remain hot-seat humans.
 - **Player 3** is a vertical card in the left rail and **Player 4** in the right
   rail. Their names and the cells/orbs counters use rotated vertical text (the
   whole label turned 90° and read top-to-bottom), so they stay compact in a
@@ -121,11 +123,12 @@ of cards:
 
 1. **Appearance** — Light / Dark theme segmented control. Applies immediately to
    every screen and is saved.
-2. **Match** — difficulty segmented control (with a “Bot · soon” badge), grid
-   stepper.
-3. **Players** — player-count segmented control (1–4) and one row per player
-   with a colour swatch and a name field. Rows above the selected count are
-   hidden.
+2. **Match** — difficulty segmented control with a live `Bot · <Difficulty>`
+   badge, grid stepper.
+3. **Players** — player-count segmented control (1–4), a **Bot opponent** switch,
+   and one row per player with a colour swatch and a name field. Rows above the
+   selected count are hidden. The Bot seat uses the label and value `Bot`, and its
+   name field is disabled.
 4. **Feedback** — Sound and Vibration switches.
 5. **Reset to defaults** — a quiet button below the cards.
 
@@ -197,6 +200,7 @@ body
     │       ├── section.panel                        Match
     │       │   ├── div.segmented[data-role="difficulty"]
     │       │   │   └── button[data-difficulty="easy|medium|hard"]
+    │       │   ├── span.badge[data-role="difficulty-badge"]
     │       │   └── div.grid-size
     │       │       ├── div.stepper
     │       │       │   ├── button[data-action="grid-rows-minus"]
@@ -212,10 +216,14 @@ body
     │       ├── section.panel                        Players
     │       │   ├── div.segmented[data-role="player-count"]
     │       │   │   └── button[data-count="1|2|3|4"]
+    │       │   ├── label.switch > input[data-setting="bot"]
+    │       │   │   └── span.switch__hint[data-role="bot-hint"]
     │       │   └── div.player-list
     │       │       └── div.player-row[data-player="1..4"]
     │       │           ├── input.player-row__color[type="color"][data-role="player-color"]
-    │       │           └── input[type="text"][data-role="player-name"]
+    │       │           └── label.player-row__name
+    │       │               ├── span.player-row__label[data-role="player-label"]
+    │       │               └── input[type="text"][data-role="player-name"]
     │       ├── section.panel                        Feedback
     │       │   ├── label.switch > input[data-setting="sound"]
     │       │   └── label.switch > input[data-setting="vibration"]
@@ -242,6 +250,7 @@ Every cell is a real `<button>`. The four orb spans are decorative
 - `Row 3, column 4, empty`
 - `Row 3, column 4, Ada, 2 of 4 orbs` (custom name)
 - `Row 3, column 4, Player 1, 2 of 4 orbs` (default name)
+- `Row 3, column 4, Bot, 2 of 4 orbs` (Bot seat, never a profile name)
 
 The board is `role="group"` rather than `role="grid"` because each item is
 already a focusable button; this avoids a broken grid/gridcell hierarchy. Its
@@ -358,7 +367,8 @@ remote font request, so the app works offline.
   row.
 - The note reads `Saved match · R × C · <name> to move`, `Last game: <name>
   won.`, `Last game ended in a draw.`, or `New game · R × R · N players`
-  (or `1 player · solo practice`).
+  (or `1 player · solo practice`). With the Bot enabled the configuration note
+  becomes `New game · R × R · N players · Bot (<Difficulty>)`.
 
 ### 5.2 Game bar and turn status (`.gamebar`, `.turn`)
 
@@ -367,7 +377,9 @@ remote font request, so the app works offline.
   It is player-coloured via `[data-player]`: `--p1-strong` … `--p4-strong`, and
   ink when the game is over.
 - Text: `Player N to move`, `<custom name> to move`, `Player N · solo
-  practice`, `<name> wins!`, or `It's a draw.`
+  practice`, `Bot is thinking…`, `<name> wins!`, or `It's a draw.`
+- While the Bot owns the turn, every board cell is removed from the tab order and
+  input is ignored until the Bot has moved.
 - `role="status"` and `aria-live="polite"` announce every turn change and the
   result to screen readers.
 - The menu button opens the in-match dialog (Keep playing, Restart match,
@@ -386,7 +398,8 @@ exceeds `state.playerCount`.
 | 4 | `score--rail` | Right rail |
 
 - Each card shows the player's custom name (or `Player N`), **cells owned**, and
-  **orbs owned**.
+  **orbs owned**. The Bot seat always shows `Bot`, regardless of the stored
+  profile name.
 - The bar cards carry no coloured left border in the idle or active state; a
   name dot in the player colour identifies the owner.
 - The rail cards have no coloured top border; their player name and the
@@ -453,8 +466,9 @@ exceeds `state.playerCount`.
   `<html data-theme="…">` immediately across every screen, regenerates the
   theme-aware player palette, and saves the choice. The same value is applied on
   startup, and an inline head script reads the saved value before first paint.
-- **Difficulty** segmented control: Easy / Medium / Hard. Saved immediately but
-  currently UI-only; a `Bot · soon` badge makes the status explicit.
+- **Difficulty** segmented control: Easy / Medium / Hard. The badge reads
+  `Bot · <Difficulty>` and the choice is saved immediately. It changes how the
+  Bot evaluates its next turn and is used by every new Bot match.
 - **Grid size** has one stepper per axis: rows and columns each 7–15, step 1,
   with the minus/plus buttons disabled at the limits. The plus/minus symbols are
   drawn as centred CSS bars rather than font glyphs, so they sit exactly in the
@@ -462,24 +476,32 @@ exceeds `state.playerCount`.
   as `<rows> × <columns>`, so boards such as 11×7 are possible. Applies on the
   next **New game**.
 - **Number of players** segmented control: 1 / 2 / 3 / 4. Applies on the next
-  **New game** and reveals the matching player rows.
+  **New game** and reveals the matching player rows. Choosing 1 player turns the
+  Bot off, because a solo practice board has no opponent.
+- **Bot opponent** switch: when on, the highest-numbered seat is played by the
+  Bot. Small tables move to two players if needed; the hint names the seat, for
+  example `Player 2 is the Bot. It cannot be renamed.` The Bot always takes the
+  last seat in the next match; it does not alter a match already in progress.
 - **Player rows**: a native colour input and a text input capped at 16
   characters. Empty names fall back to `Player N` on blur. Names and colours
-  apply immediately, including to an existing match.
+  apply immediately, including to an existing match. The Bot's label and value
+  are fixed to `Bot`, and its text input is disabled.
 - **Feedback**: Sound and Vibration switches. Both gate the corresponding
   platform calls on the next move.
 - **Reset to defaults** restores the full default settings object and saves it.
 
 All settings are written to `color-wars:settings` as
-`{ version: 3, settings: GameSettings }` on every change. Version-1 blobs that
-stored a single square `gridSize` are migrated onto both axes on load, and
-version-1/2 blobs without a theme default to light.
+`{ version: 4, settings: GameSettings }` on every change. Version-1 blobs that
+stored a single square `gridSize` are migrated onto both axes on load;
+version-1/2 blobs without a theme default to light; and version 1–3 blobs
+without a `bot` flag default it to off.
 
 ### 5.8 How to play screen
 
 - Header with a back button and the title, then a scrollable rules document.
 - Covers goal, legal moves, capacities, cascade behaviour, multi-player
-  elimination, solo practice, keyboard controls, and a strategy tip.
+  elimination, solo practice, the optional Bot and its three difficulties,
+  keyboard controls, and a strategy tip.
 - Opened from the home screen or from the in-match menu; the back button
   returns to the opener.
 
@@ -499,15 +521,18 @@ Used for three things:
 2. **Restart confirmation** — title "Restart match?", the warning that the
    match and save will be lost, and **No, keep playing** (primary) /
    **Yes, restart**. Shown when Restart match is chosen during a live game.
-3. **Game menu** — title "Paused", the current turn, **Keep playing** (primary),
-   **Restart match**, **How to play**, and **Back to home**.
+3. **Game menu** — title "Paused", the current turn (`Bot is thinking…` when
+   applicable), **Keep playing** (primary), **Restart match**, **How to play**,
+   and **Back to home**.
 
 Behaviour:
 
 - Native `<dialog>` with `showModal()`: focus is trapped, `Escape` cancels, the
   backdrop dims the board.
 - Clicking the backdrop closes the dialog.
-- Closing restores focus to the board.
+- Closing restores focus to the board. During the Bot's turn focus lands on the
+  menu button and the Bot resumes after a short pause, so input cannot race the
+  AI.
 - A finished saved game does not pop the dialog on launch; the home screen
   reports the result and **Resume** is hidden.
 
@@ -531,6 +556,8 @@ Behaviour:
 | Capture | Target keeps the old owner colour while the orb flies, then takes the new colour |
 | Win | Status text + modal dialog; board locked |
 | Solo mode | One score card, status reads `Player N · solo practice`, never ends |
+| Bot turn | Status reads `Bot is thinking…`; board tab stops removed until the move lands |
+| Bot seat | Name shows `Bot` on the board, score card, and settings row; name field disabled |
 | Saved game | Restored on launch behind the home screen |
 
 Because the board is re-rendered from `GameState` after every move, the DOM can
@@ -550,12 +577,13 @@ never show an orb the model does not contain (the legacy "ghost coin" bug).
   and starts fresh from the current settings.
 - **Settings:** segmented buttons and the stepper update the saved settings
   immediately; the theme control repaints the whole app; player rows update
-  names/colours live; switches gate sound and vibration.
+  names/colours live; the Bot switch and difficulty pick the next match's AI
+  seat and strength; switches gate sound and vibration.
 - **Menu:** **How to play** opens the rules; **Restart match** asks for
   confirmation before clearing the board; **Back to home** keeps the save.
 - **Illegal actions** (enemy cell, out of bounds, after game over, while a
-  dialog is open, or outside the match screen) are ignored; the turn does not
-  change and nothing is saved.
+  dialog is open, outside the match screen, or while the Bot is thinking) are
+  ignored; the turn does not change and nothing is saved.
 - **Haptics:** a short vibration on accepted moves and a slightly longer one on
   rejected moves where the platform supports `navigator.vibrate`; suppressed
   while the Vibration setting is off and silently skipped where unsupported.
@@ -607,9 +635,12 @@ never show an orb the model does not contain (the legacy "ghost coin" bug).
 - Every cell is a `<button>` with a descriptive `aria-label` including row,
   column, owner name, and orb count.
 - The turn and result text live in an `aria-live="polite"` status region; the
-  row and column values in Settings are also live.
+  row and column values in Settings are also live. `Bot is thinking…` is
+  announced in the same region.
+- The Bot seat is labelled `Bot` in cell labels, score cards, and settings; its
+  name input is disabled rather than silently ignoring edits.
 - Illegal cells expose `aria-disabled="true"`; the game-over state disables all
-  cells.
+  cells, and the Bot turn removes the board's tab stop until the move lands.
 - Ownership is not colour-only: each player has a distinct orb fill/ring and the
   active card has a text "playing" pill.
 - Visible `:focus-visible` rings on cells, icon buttons, steppers, inputs, and
@@ -637,8 +668,8 @@ navigable and keep the focus rings, text contrast, and non-colour orb patterns.
   dialog, then ask before leaving a live match, then exit. That adapter lives in
   `src/platform/backButton.ts`.
 - Preferences will replace `localStorage` behind the same `KeyValueStore`
-  interface, so the UI code does not change. Save version 2 and settings
-  versions 1–3 are the payloads to migrate.
+  interface, so the UI code does not change. Save versions 2–3 and settings
+  versions 1–4 are the payloads to migrate.
 - Haptics will use `@capacitor/haptics` behind the existing `Haptics`
   interface.
 - Sound uses the Web Audio API today; native audio can replace it behind the

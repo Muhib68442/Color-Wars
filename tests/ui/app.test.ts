@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   applyMove,
   createGame,
@@ -91,6 +91,12 @@ function overlay(root: HTMLElement): HTMLDialogElement {
 function overlayTitle(root: HTMLElement): string {
   return (
     root.querySelector("[data-role='overlay-title']")?.textContent ?? ""
+  );
+}
+
+function overlayBody(root: HTMLElement): string {
+  return (
+    root.querySelector("[data-role='overlay-body']")?.textContent ?? ""
   );
 }
 
@@ -188,6 +194,39 @@ function selectPlayerCount(root: HTMLElement, count: number): void {
   button(root, "settings").click();
   countButton(root, count).click();
   button(root, "settings-back").click();
+}
+
+function botSwitch(root: HTMLElement): HTMLInputElement {
+  const input = settingsRoot(root).querySelector<HTMLInputElement>(
+    "[data-setting='bot']",
+  );
+  if (input === null) throw new Error("Missing Bot switch");
+  return input;
+}
+
+function setBot(root: HTMLElement, enabled: boolean): void {
+  const input = botSwitch(root);
+  input.checked = enabled;
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+function difficultyButton(
+  root: HTMLElement,
+  difficulty: "easy" | "medium" | "hard",
+): HTMLButtonElement {
+  const element = settingsRoot(root).querySelector<HTMLButtonElement>(
+    `[data-difficulty='${difficulty}']`,
+  );
+  if (element === null) throw new Error(`Missing difficulty: ${difficulty}`);
+  return element;
+}
+
+function scoreName(root: HTMLElement, player: number): string {
+  return (
+    root.querySelector<HTMLElement>(
+      `.score[data-player='${player}'] .score__name`,
+    )?.textContent ?? ""
+  );
 }
 
 function visibleScores(root: HTMLElement): HTMLElement[] {
@@ -828,5 +867,188 @@ describe("save and resume", () => {
     expect(app.getState().moveCount).toBe(0);
     expect(overlay(root).hasAttribute("open")).toBe(false);
     expect(status(root)).toBe("Player 1 to move");
+  });
+});
+
+describe("Bot opponent", () => {
+  it("enables the Bot, forces its name, and summarises the match", () => {
+    const { root, app, settingsStore } = mount();
+
+    button(root, "settings").click();
+    expect(botSwitch(root).checked).toBe(false);
+    expect(playerNameInput(root, 2).disabled).toBe(false);
+
+    setBot(root, true);
+
+    expect(app.getSettings().bot).toBe(true);
+    expect(app.getSettings().playerCount).toBe(2);
+    expect(settingsStore.load().bot).toBe(true);
+    expect(countButton(root, 2).getAttribute("aria-pressed")).toBe("true");
+
+    const name = playerNameInput(root, 2);
+    expect(name.value).toBe("Bot");
+    expect(name.disabled).toBe(true);
+    expect(name.getAttribute("aria-label")).toBe("Bot name");
+    expect(playerColorInput(root, 2).getAttribute("aria-label")).toBe(
+      "Bot colour",
+    );
+    expect(
+      playerRow(root, 2).querySelector("[data-role='player-label']")
+        ?.textContent,
+    ).toBe("Bot");
+
+    // Even a programmatic edit cannot rename the Bot.
+    name.value = "Alice";
+    name.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(settingsStore.load().profiles[2].name).toBe("Player 2");
+    expect(name.value).toBe("Bot");
+
+    button(root, "settings-back").click();
+    expect(saveNote(root)).toBe(
+      "New game · 7 × 7 · 2 players · Bot (Medium)",
+    );
+
+    startMatch(root);
+    expect(app.getState().botPlayer).toBe(2);
+    expect(scoreName(root, 2)).toBe("Bot");
+  });
+
+  it("updates the difficulty badge and persists the choice", () => {
+    const { root, settingsStore } = mount();
+
+    button(root, "settings").click();
+    difficultyButton(root, "hard").click();
+
+    expect(settingsStore.load().difficulty).toBe("hard");
+    expect(
+      settingsRoot(root).querySelector("[data-role='difficulty-badge']")
+        ?.textContent,
+    ).toBe("Bot · Hard");
+    expect(settingsRoot(root).querySelector("[data-role='bot-hint']")
+      ?.textContent).toContain("last player");
+
+    setBot(root, true);
+    expect(settingsRoot(root).querySelector("[data-role='bot-hint']")
+      ?.textContent).toContain("Player 2 is the Bot");
+
+    button(root, "settings-back").click();
+    expect(saveNote(root)).toContain("Bot (Hard)");
+  });
+
+  it("moves a solo board to two players when the Bot is enabled", () => {
+    const { root, app, settingsStore } = mount({
+      settings: { ...defaultSettings(), playerCount: 1 },
+    });
+
+    button(root, "settings").click();
+    expect(countButton(root, 1).getAttribute("aria-pressed")).toBe("true");
+
+    setBot(root, true);
+
+    expect(app.getSettings().playerCount).toBe(2);
+    expect(settingsStore.load().playerCount).toBe(2);
+    expect(countButton(root, 2).getAttribute("aria-pressed")).toBe("true");
+    expect(playerRow(root, 2).hidden).toBe(false);
+  });
+
+  it("turns the Bot off when the table drops to one player", () => {
+    const { root, app, settingsStore } = mount({
+      settings: { ...defaultSettings(), bot: true },
+    });
+
+    button(root, "settings").click();
+    countButton(root, 1).click();
+
+    expect(app.getSettings().bot).toBe(false);
+    expect(app.getSettings().playerCount).toBe(1);
+    expect(botSwitch(root).checked).toBe(false);
+    expect(settingsStore.load().bot).toBe(false);
+  });
+
+  it("plays the Bot turn after the human move and locks the board", () => {
+    vi.useFakeTimers();
+    try {
+      const { root, app, store } = mount({
+        settings: { ...defaultSettings(), bot: true },
+      });
+      startMatch(root);
+
+      cellButton(root, 0, 0).click();
+
+      expect(app.getState().moveCount).toBe(1);
+      expect(app.getState().currentPlayer).toBe(2);
+      expect(status(root)).toBe("Bot is thinking…");
+      expect(
+        root.querySelectorAll("button.cell[tabindex='0']"),
+      ).toHaveLength(0);
+
+      // The Bot's move is ignored while it is thinking.
+      cellButton(root, 0, 1).click();
+      expect(app.getState().moveCount).toBe(1);
+
+      vi.advanceTimersByTime(1000);
+
+      expect(app.getState().moveCount).toBe(2);
+      expect(app.getState().currentPlayer).toBe(1);
+      expect(status(root)).toBe("Player 1 to move");
+      expect(store.getItem(SAVE_KEY)).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("pauses the Bot while the game menu is open", () => {
+    vi.useFakeTimers();
+    try {
+      const { root, app } = mount({
+        settings: { ...defaultSettings(), bot: true },
+      });
+      startMatch(root);
+      cellButton(root, 0, 0).click();
+      expect(status(root)).toBe("Bot is thinking…");
+
+      button(root, "menu").click();
+      expect(overlayBody(root)).toBe("Bot is thinking…");
+
+      // The queued move is paused while the dialog is open.
+      vi.advanceTimersByTime(2000);
+      expect(app.getState().moveCount).toBe(1);
+
+      action(root, "Keep playing").click();
+      vi.advanceTimersByTime(500);
+
+      expect(app.getState().moveCount).toBe(2);
+      expect(status(root)).toBe("Player 1 to move");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("resumes a saved Bot turn and lets the Bot move", () => {
+    vi.useFakeTimers();
+    try {
+      const board = emptyBoard(7, 7);
+      setCell(board, 2, 2, cell(1, 1));
+      setCell(board, 2, 3, cell(2, 1));
+      const saved = makeState(board, {
+        currentPlayer: 2,
+        botPlayer: 2,
+      });
+      const { root, app } = mount({ seed: saved });
+
+      resumeMatch(root);
+
+      expect(app.getState().botPlayer).toBe(2);
+      expect(status(root)).toBe("Bot is thinking…");
+      expect(scoreName(root, 2)).toBe("Bot");
+
+      vi.advanceTimersByTime(500);
+
+      expect(app.getState().moveCount).toBe(saved.moveCount + 1);
+      expect(app.getState().currentPlayer).toBe(1);
+      expect(status(root)).toBe("Player 1 to move");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
