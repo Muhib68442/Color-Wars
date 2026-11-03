@@ -13,7 +13,7 @@ in `legacy/main.py` is archived for reference and is no longer maintained.
 
 > **Status: playable web build.** The pure engine, home/menu flow, settings,
 > light/dark themes, multi-player boards, save/resume, and the Bot opponent are
-> complete and covered by 116 Vitest tests. Phase 3 wraps the Vite build in a
+> complete and covered by 120 Vitest tests. Phase 3 wraps the Vite build in a
 > Capacitor Android shell; Phase 4 handles signing and release. See the
 > [roadmap](#roadmap).
 
@@ -65,8 +65,9 @@ and **About**, plus **Resume** when an unfinished saved match exists.
   Easy/Medium/Hard difficulty, grid rows and columns, number of players,
   per-player names and colours, sound, and vibration. Changes are saved
   immediately; the theme also applies on the next launch without a light flash.
-  Difficulty changes how the Bot searches for a move; Easy is random, Medium is
-  one-ply greedy, and Hard also avoids leaving an immediate detonation.
+  Difficulty changes how the Bot searches for a move; Easy is random, Medium
+  greedily builds and attacks, and Hard also searches your strongest reply
+  before choosing.
 - The in-match menu offers How to play, Restart, and Back to home. When the game
   ends, a result dialog appears and the board is locked until you start again.
 
@@ -176,7 +177,7 @@ regression coverage in the test suite.
 | 1 | pure TypeScript engine (`src/engine/`) + Vitest suite, no visual change | done |
 | 2 | rebuild the UI on the engine: visible turn banner, win overlay, restart, save/resume, accessibility | done |
 | 2.5 | home menu, settings, light/dark themes, 1–4 players, dynamic grids, names/colours, sound and vibration toggles | done |
-| 2.6 | Bot opponent with Easy/Medium/Hard difficulty, fixed `Bot` name, save-resumable AI seat | done |
+| 2.6 | Bot opponent with Easy/Medium/Hard difficulty, stacking/attack heuristic, 2-ply Hard search, fixed `Bot` name, save-resumable AI seat | done |
 | 3 | Capacitor 8 shell, Android project, Preferences persistence hardening, device matrix | next |
 | 4 | signing, release build, Play checklist, hardening | planned |
 

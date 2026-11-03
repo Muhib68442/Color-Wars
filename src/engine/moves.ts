@@ -7,7 +7,7 @@ import {
   setCell,
 } from "./board.js";
 import { resolveCascades } from "./cascade.js";
-import { evaluateWinner } from "./winner.js";
+import { evaluateCascadeLimit, evaluateWinner } from "./winner.js";
 import type {
   CellRef,
   GameEvent,
@@ -116,8 +116,8 @@ export function applyMove(
 
   if (next.cascadeLimitReached) {
     next.gameOver = true;
-    next.winner = null;
-    events.push({ type: "win", winner: null });
+    next.winner = evaluateCascadeLimit(next);
+    events.push({ type: "win", winner: next.winner });
   } else {
     const verdict = evaluateWinner(next);
     if (verdict.gameOver) {

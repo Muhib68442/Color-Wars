@@ -165,4 +165,52 @@ describe("scored Bot difficulties", () => {
     expect(getCell(afterMedium.board, 0, 0)?.owner).toBe(2);
     expect(getCell(afterHard.board, 0, 0)?.owner).not.toBe(2);
   });
+
+  /**
+   * The Bot owns one cell near the middle and the rival owns a corner. Taking
+   * the empty corner would spread the Bot thin; stacking its own cell builds
+   * toward a detonation that can take the board.
+   */
+  it("medium and hard build up an owned cell instead of spreading", () => {
+    const state = gameWith(
+      (board) => {
+        setCell(board, 3, 3, cell(2, 1));
+        setCell(board, 0, 0, cell(1, 1));
+      },
+      { currentPlayer: 2 },
+    );
+
+    for (const difficulty of ["medium", "hard"] as const) {
+      expect(
+        chooseBotMove(state, { difficulty, random: () => 0 }),
+      ).toEqual({ row: 3, col: 3 });
+    }
+  });
+
+  /**
+   * A corner at capacity-1 detonates on the next placement and captures both
+   * adjacent rival cells. Both searching difficulties should take it.
+   */
+  it("medium and hard detonate to capture rival orbs", () => {
+    const state = gameWith(
+      (board) => {
+        setCell(board, 0, 0, cell(2, 1));
+        setCell(board, 0, 1, cell(1, 1));
+        setCell(board, 1, 0, cell(1, 1));
+        setCell(board, 6, 6, cell(1, 1));
+      },
+      { currentPlayer: 2 },
+    );
+
+    for (const difficulty of ["medium", "hard"] as const) {
+      const move = chooseBotMove(state, { difficulty, random: () => 0 });
+      expect(move).toEqual({ row: 0, col: 0 });
+
+      const result = applyMove(state, move!);
+      expect(getCell(result.state.board, 0, 1)?.owner).toBe(2);
+      expect(getCell(result.state.board, 1, 0)?.owner).toBe(2);
+      expect(orbsOf(result.state, 2)).toBeGreaterThan(orbsOf(state, 2));
+      expect(orbsOf(result.state, 1)).toBeLessThan(orbsOf(state, 1));
+    }
+  });
 });

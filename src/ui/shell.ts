@@ -245,8 +245,8 @@ const SHELL_TEMPLATE = /* html */ `
       <p>
         Turn on Bot opponent in Settings to give the last seat to the Bot. Its
         name is always Bot, and the Difficulty setting changes how it chooses
-        moves: Easy plays at random, Medium weighs each move, and Hard also
-        avoids leaving you an immediate detonation.
+        moves: Easy plays at random, Medium builds its own cells and attacks
+        yours, and Hard also searches your strongest reply before it commits.
       </p>
 
       <h3>Controls</h3>
@@ -306,8 +306,9 @@ const SHELL_TEMPLATE = /* html */ `
             <button type="button" data-difficulty="hard" aria-pressed="false">Hard</button>
           </div>
           <p class="field__hint">
-            Sets how the Bot plays. It applies to the Bot's next turn and to
-            every new game.
+            Easy plays at random, Medium builds and attacks, and Hard searches
+            your best reply. Applies to the Bot's next turn and to every new
+            game.
           </p>
         </div>
 

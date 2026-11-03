@@ -44,7 +44,7 @@ describe("win detection", () => {
     expect(blocked.events).toEqual([]);
   });
 
-  it("caps a pathological cascade and ends in a draw", () => {
+  it("awards a capped cascade to the player with the strongest board", () => {
     const board = emptyBoard(7, 7);
     setCell(board, 3, 3, cell(1, 3));
     setCell(board, 3, 4, cell(1, 3));
@@ -58,10 +58,56 @@ describe("win detection", () => {
     expect(result.accepted).toBe(true);
     expect(result.state.cascadeLimitReached).toBe(true);
     expect(result.state.gameOver).toBe(true);
-    expect(result.state.winner).toBeNull();
+    expect(result.state.winner).toBe(1);
     expect(
       result.events.some((event) => event.type === "cascade-limit"),
     ).toBe(true);
+    expect(
+      result.events.some(
+        (event) => event.type === "win" && event.winner === 1,
+      ),
+    ).toBe(true);
+  });
+
+  it("gives a capped cascade to the rival when it holds more orbs", () => {
+    const board = emptyBoard(7, 7);
+    setCell(board, 3, 3, cell(1, 2));
+    for (const [row, col] of [
+      [0, 0],
+      [0, 3],
+      [0, 6],
+      [6, 0],
+      [6, 6],
+    ] as const) {
+      setCell(board, row, col, cell(2, 1));
+    }
+
+    // A zero cap stops before any explosion: player 1 has 3 orbs after the
+    // placement, player 2 still has 5.
+    const result = applyMove(
+      makeState(board),
+      { row: 3, col: 3 },
+      { maxCascadeSteps: 0 },
+    );
+
+    expect(result.state.cascadeLimitReached).toBe(true);
+    expect(result.state.winner).toBe(2);
+  });
+
+  it("still draws a capped cascade when orbs and cells are tied", () => {
+    const board = emptyBoard(7, 7);
+    setCell(board, 3, 3, cell(1, 2));
+    setCell(board, 0, 3, cell(2, 3));
+
+    const result = applyMove(
+      makeState(board),
+      { row: 3, col: 3 },
+      { maxCascadeSteps: 0 },
+    );
+
+    expect(result.state.cascadeLimitReached).toBe(true);
+    expect(result.state.gameOver).toBe(true);
+    expect(result.state.winner).toBeNull();
   });
 
   it("eliminates two opponents in one cascade and declares the survivor", () => {

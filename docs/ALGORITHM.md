@@ -197,8 +197,14 @@ eliminate Players 2–4.
 
 Checking after the cascade matters because players can be eliminated by a chain
 reaction triggered by someone else's move — including two players in a single
-cascade. A `cascade-limit` safety stop is also treated as a draw (`winner =
-null`) and is never saved.
+cascade.
+
+A `cascade-limit` safety stop ends the match because the board is still
+unstable and cannot continue. It is never saved. Rather than forcing a draw
+while one side dominates, the capped result goes to the strongest position:
+most orbs, then most cells. If both are tied the match is a draw, and solo
+practice has no opponent to beat. In the TypeScript engine this is
+`evaluateCascadeLimit(state)`.
 
 Solo mode (`playerCount === 1`) returns no verdict at all, so the board never
 locks and the player can keep experimenting indefinitely.
@@ -219,31 +225,43 @@ play an illegal move and therefore never needs special-case rules:
 - **Easy** — pick a uniformly random legal move.
 - **Medium** — apply every legal move on a clone and take the highest static
   evaluation.
-- **Hard** — rank the same moves, keep the best handful, and reject any move
-  that lets the next opponent detonate an already armed cell.
+- **Hard** — rank the same moves, then search the strongest rival reply before
+  choosing, so it takes captures and avoids handing over a winning detonation.
 
 ### 6.1 Static evaluation
 
-For the Bot's seat `me`, one board pass produces each player's orb and cell
-totals. The score is:
+For the Bot's seat `me`, one board pass scores every occupied cell:
 
 ```
-value(player) = orbs × 1.5 + cells × 4
-material      = value(me) − average(value(rivals))
-lead          = value(me) − max(value(rivals))
-pressure      = +1.4 per own cell at capacity−1
-                −1.8 per rival cell at capacity−1
-score         = material + 0.35 × lead + pressure
+progress      = orbs / capacity
+value(cell)   = orbs × 1.8
+              + 0.25                                  // presence
+              + max(0, orbs − 1) × 1.1                // stacking
+              + progress² × 1.6                       // near detonation
+              + (armed ? 1.4 × progress : 0)
+              + Σ adjacent rival cells:
+                  0.9 × (1.6 + rival orbs × 1.2)      // only when armed
 ```
 
-`cells` are weighted higher than `orbs` because territory creates future
-explosion options. The `lead` term makes the Bot care about the strongest rival
-rather than only the total opposition, and `pressure` makes a nearly full cell
-visible as both an asset and a threat.
+`value(player)` is the sum of that player's cells. A huge stack therefore scores
+far above a scattering of one-orb cells, which is what makes the Bot reinforce
+its own cells instead of claiming every empty square. The progress and armed
+terms make a cell one placement from detonating valuable, and the adjacency
+bonus makes an armed cell next to rival orbs a takeover threat rather than just
+a defensive liability.
+
+The final score compares the Bot with the field:
+
+```
+score = value(me) − 0.7 × max(value(rivals)) − 0.3 × average(value(rivals))
+```
+
+The strongest rival dominates the penalty, while the average keeps the Bot
+aware of the rest of a three- or four-player table.
 
 A finished game short-circuits the evaluation: a win for `me` is
-`+1_000_000`, a draw `−500_000`, and a loss `−1_000_000`, so any immediate win
-outranks every positional consideration.
+`+1_000_000`, a draw `0`, and a loss `−1_000_000`, so any immediate win outranks
+every positional consideration.
 
 ### 6.2 Easy
 
@@ -273,25 +291,33 @@ reply.
 
 ### 6.4 Hard
 
-Hard starts from the same ranked list but only inspects the top eight moves. For
-each candidate it enumerates the opponent's **immediate threats**: rival-owned
-cells that are one orb below capacity, capped at sixteen, because those are the
-only replies that can resolve a detonation on the spot. It applies each reply
-and keeps the worst resulting score:
+Hard first looks for an immediate win and returns it without searching. It then
+keeps the twelve strongest root moves and runs a bounded minimax search two
+plies deep:
 
 ```text
-for candidate in bestEight(ranked):
-    worst = candidate.score
-    for reply in immediateThreats(candidate.state):
-        worst = min(worst, evaluate(applyMove(candidate.state, reply), me))
-    keep the candidate with the highest worst-case score
+for candidate in bestTwelve(rankMoves(state, me)):
+    value = search(candidate.state, me, depth = 1, beam = 8)
+    keep the candidate with the highest value
+
+search(state, me, depth, beam):
+    if state.gameOver or depth == 0: return evaluate(state, me)
+    ranked = rankMoves(state, state.currentPlayer)   // moves for whoever is up
+    branch = bestEight(ranked)
+    if state.currentPlayer == me: return max(values)
+    return min(values)
 ```
 
-This is a bounded 2-ply check with no general tree search. It is cheap enough
-for the 225-cell board and directly targets the common blunder of leaving a
-rival cell armed; it does not predict multi-move plans. Ties in every difficulty
-are broken with the injectable `random` function, which keeps tests
-deterministic.
+The Bot maximises and every rival minimises, so `value` is the worst score the
+Bot can be left with after the opponent's strongest reply. Moves that capture,
+build a real threat, or defuse a rival stack survive the root cut; a move that
+lets the opponent detonate is rejected even if it scores well statically.
+
+The search is deliberately narrow rather than exhaustive: 12 root candidates ×
+8 replies keeps a populated 15×15 position around 150 ms in the test suite. It
+sees immediate captures and one-move threats but does not build multi-move
+plans. Ties in every difficulty are broken with the injectable `random`
+function, which keeps tests deterministic.
 
 ### 6.5 Turn ownership in the UI
 
@@ -448,8 +474,9 @@ function applyMove(state, cell, options):
     resolveCascades(next, cell, events, options.maxCascadeSteps)
 
     if next.cascadeLimitReached:
-        next.gameOver = true; next.winner = null
-        events.push(Win(null))
+        next.gameOver = true
+        next.winner = evaluateCascadeLimit(next)  // orbs, then cells, else null
+        events.push(Win(next.winner))
     else:
         verdict = evaluateWinner(next)
         if verdict.gameOver:
@@ -473,7 +500,7 @@ This removes the ghost-coin class of bug entirely: the DOM or Pygame surface is
 always rebuilt from the model, never patched ad hoc.
 
 The Bot reuses the same `applyMove` (on cloned states) for every candidate and
-threat reply, so its search and the real turn can never disagree about the rules.
+reply, so its search and the real turn can never disagree about the rules.
 
 ---
 

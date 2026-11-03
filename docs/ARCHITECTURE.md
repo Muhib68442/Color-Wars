@@ -300,7 +300,8 @@ Pygame, Capacitor, or storage.
 | `legalMoves(state)` / `isLegalMove(state, move)` | Move validation |
 | `applyMove(state, move)` | Pure move application; returns `{ state, events, accepted }` |
 | `evaluateWinner(state)` | Multi-player elimination, draw, and solo behaviour |
-| `chooseBotMove(state, { difficulty })` | Legal move for the AI seat; Easy random, Medium greedy, Hard bounded threat check |
+| `evaluateCascadeLimit(state)` | Winner by orbs then cells when the cascade safety cap trips |
+| `chooseBotMove(state, { difficulty })` | Legal move for the AI seat; Easy random, Medium greedy, Hard bounded 2-ply minimax |
 | `BOT_NAME` | The fixed display name `Bot` used by the UI |
 | `alivePlayers(state)` / `nextPlayer(state)` | Survivors and turn order (skips eliminated players) |
 | `countOrbs` / `countCells` / `isStable` | Derived state and invariants |
@@ -374,7 +375,7 @@ so the same build runs in a desktop browser and inside the APK.
 | 1 | pure TypeScript engine + Vitest suite (no visual change) | **done** |
 | 2 | rewrite the UI against the engine: visible turn banner, win overlay, restart, save/resume, accessibility | **done** |
 | 2.5 | home menu, settings, 1–4 players, 7–15 rows/columns, names/colours, sound and vibration toggles | **done** |
-| 2.6 | Bot opponent with Easy/Medium/Hard difficulty, fixed `Bot` name, save-resumable AI seat | **done** |
+| 2.6 | Bot opponent with Easy/Medium/Hard difficulty, stacking/attack heuristic, 2-ply Hard search, fixed `Bot` name, save-resumable AI seat | **done** |
 | 3 | Capacitor shell, Android project, Preferences persistence hardening, device testing | next |
 | 4 | signing, release build, Play checklist, hardening | planned |
 
@@ -421,8 +422,10 @@ Studio 2025.2.1+, fully offline assets, no runtime permissions required.
 - **Players:** done — 1–4 players via `Player`/`PlayerCount`, `hasPlayed`, and
   `nextPlayer` turn rotation.
 - **AI:** done — `src/engine/bot.ts` exposes `chooseBotMove` over
-  `legalMoves` + `applyMove`, with Easy, Medium, and Hard difficulty; the Bot
-  seat is stored in `GameState.botPlayer` and persisted.
+  `legalMoves` + `applyMove`, with Easy, Medium, and Hard difficulty. The
+  heuristic rewards stacking and armed attacks; Hard adds a 2-ply minimax over
+  the strongest root moves and replies. The Bot seat is stored in
+  `GameState.botPlayer` and persisted.
 - **Undo:** snapshot the state before each move.
 - **Network play:** serialise `applyMove` inputs or event streams.
 - **Persistence:** store the board as a compact string (`0`–`4` plus orb
@@ -438,7 +441,7 @@ Studio 2025.2.1+, fully offline assets, no runtime permissions required.
 ## 6. Testing strategy
 
 The engine is tested with **Vitest** (`npm test`), independently of the DOM and
-of Capacitor. The suite currently has **116 tests across 9 files**.
+of Capacitor. The suite currently has **120 tests across 9 files**.
 
 1. **Board and capacity** (`tests/engine/board.test.ts`)
    - corners 2, edges 3, interior 4;
@@ -475,6 +478,8 @@ of Capacitor. The suite currently has **116 tests across 9 files**.
    - every difficulty returns a legal move or null;
    - Easy samples uniformly from the legal move list;
    - Medium and Hard take an immediate win;
+   - Medium and Hard build an owned cell instead of spreading to an empty one;
+   - Medium and Hard detonate to capture adjacent rival orbs;
    - Hard rejects the greedy move when it leaves an opponent's armed cell, and
      keeps more orbs after the opponent's best reply.
 7. **Storage and settings** (`tests/platform/`)

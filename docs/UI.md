@@ -467,8 +467,10 @@ exceeds `state.playerCount`.
   theme-aware player palette, and saves the choice. The same value is applied on
   startup, and an inline head script reads the saved value before first paint.
 - **Difficulty** segmented control: Easy / Medium / Hard. The badge reads
-  `Bot · <Difficulty>` and the choice is saved immediately. It changes how the
-  Bot evaluates its next turn and is used by every new Bot match.
+  `Bot · <Difficulty>` and the choice is saved immediately. Easy plays a random
+  legal move, Medium greedily builds its own cells and attacks rival ones, and
+  Hard searches the opponent's strongest reply before committing. The choice
+  applies to the Bot's next turn and to every new Bot match.
 - **Grid size** has one stepper per axis: rows and columns each 7–15, step 1,
   with the minus/plus buttons disabled at the limits. The plus/minus symbols are
   drawn as centred CSS bars rather than font glyphs, so they sit exactly in the

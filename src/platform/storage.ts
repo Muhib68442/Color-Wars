@@ -130,7 +130,7 @@ export function isGameState(value: unknown): value is GameState {
     return false;
   }
 
-  // A cascade-limit draw is a defensive state, not a resumable game.
+  // A capped cascade is a safety stop, not a resumable game.
   if (value["cascadeLimitReached"] !== false) return false;
 
   return true;
