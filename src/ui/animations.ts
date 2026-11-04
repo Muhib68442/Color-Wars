@@ -1,19 +1,54 @@
-import type { GameEvent } from "../engine/index.js";
+import {
+  cloneState,
+  type GameEvent,
+  type GameState,
+} from "../engine/index.js";
 import { strengthenColor } from "../platform/settings.js";
 import type { BoardView } from "./boardView.js";
+import {
+  applyGameEvent,
+  groupEvents,
+  type ReplayGroup,
+} from "./replay.js";
 
 type CellEffect = "place" | "add" | "explode";
+type Tracker = (animation: Animation) => void;
+
+export interface ReplayCallbacks {
+  /** Show a board snapshot while the cascade is still resolving. */
+  render(state: GameState): void;
+  /** Called once every group has been shown. */
+  done(): void;
+}
+
+export interface ReplayHandle {
+  cancel(): void;
+}
 
 /** How long an orb spends in the air when it jumps to a neighbour. */
-const FLIGHT_MS = 280;
-/** Delay between cascade steps, capped so long chains still feel immediate. */
-const STEP_MS = 110;
-const MAX_STEP = 10;
-const MAX_FLIGHTS = 72;
-const MAX_CELL_EFFECTS = 90;
-const MAX_TRANSFER_EFFECTS = 120;
+const FLIGHT_MS = 560;
+/** Gap between two orbs leaving the same explosion. */
+const TRANSFER_STAGGER_MS = 165;
+/** Pulse on the cell that detonates. */
+const EXPLODE_PULSE_MS = 400;
+/** Pause after the last orb of a group lands before the next cell explodes. */
+const LANDING_HOLD_MS = 180;
+/** Pause after placing/adding the opening orb. */
+const PLACE_HOLD_MS = 360;
+/** Cross-fade from the old owner colour to the new one. */
+const TAKEOVER_MS = 480;
+/** Fade-in for the orb that has just arrived. */
+const ORB_REVEAL_MS = 220;
+/** Expanding landing/explosion ring. */
+const RING_MS = 440;
+/**
+ * Long cascades are compressed to this budget so a pathological chain cannot
+ * lock the UI for minutes. Short cascades use the full, deliberately slow pace.
+ */
+const MAX_REPLAY_MS = 20_000;
 
 const active = new WeakMap<Element, Animation>();
+const takeovers = new WeakMap<Element, Animation>();
 let fxLayer: HTMLDivElement | null = null;
 
 function prefersReducedMotion(): boolean {
@@ -24,15 +59,42 @@ function prefersReducedMotion(): boolean {
   );
 }
 
-function canAnimate(element: Element): boolean {
+function canAnimateElement(element: Element): boolean {
   return (
     typeof element.animate === "function" &&
     typeof KeyframeEffect !== "undefined"
   );
 }
 
-function stepDelay(step: number): number {
-  return Math.min(Math.max(step, 0), MAX_STEP) * STEP_MS;
+function canPlayEvents(view: BoardView): boolean {
+  if (prefersReducedMotion()) return false;
+  if (typeof document === "undefined" || typeof window === "undefined") {
+    return false;
+  }
+  return canAnimateElement(view.element);
+}
+
+function scaled(ms: number, scale: number): number {
+  return Math.max(1, Math.round(ms * scale));
+}
+
+function groupDuration(group: ReplayGroup): number {
+  if (group.lead.type !== "explode") return PLACE_HOLD_MS;
+
+  const lastStart =
+    group.transfers.length === 0
+      ? 0
+      : (group.transfers.length - 1) * TRANSFER_STAGGER_MS;
+  return (
+    Math.max(EXPLODE_PULSE_MS, lastStart + FLIGHT_MS + TAKEOVER_MS) +
+    LANDING_HOLD_MS
+  );
+}
+
+function timingScale(groups: ReplayGroup[]): number {
+  let total = 0;
+  for (const group of groups) total += groupDuration(group);
+  return total > MAX_REPLAY_MS ? MAX_REPLAY_MS / total : 1;
 }
 
 function cellKeyframes(effect: CellEffect): Keyframe[] {
@@ -65,44 +127,65 @@ function cellKeyframes(effect: CellEffect): Keyframe[] {
   }
 }
 
-function cellOptions(effect: CellEffect): KeyframeAnimationOptions {
+function cellDuration(effect: CellEffect, scale: number): number {
   switch (effect) {
     case "place":
-      return { duration: 190, easing: "cubic-bezier(.2,.9,.3,1.2)" };
+      return scaled(280, scale);
     case "add":
-      return { duration: 180, easing: "ease-out" };
+      return scaled(240, scale);
     case "explode":
-      return { duration: 360, easing: "cubic-bezier(.2,.7,.3,1)" };
+      return scaled(EXPLODE_PULSE_MS, scale);
   }
 }
 
-function animateCell(element: Element, effect: CellEffect, delay: number): void {
-  if (!canAnimate(element)) return;
+function cellEasing(effect: CellEffect): string {
+  switch (effect) {
+    case "place":
+      return "cubic-bezier(.2,.9,.3,1.2)";
+    case "add":
+      return "ease-out";
+    case "explode":
+      return "cubic-bezier(.2,.7,.3,1)";
+  }
+}
+
+function animateCell(
+  element: Element,
+  effect: CellEffect,
+  delay: number,
+  scale: number,
+  track: Tracker,
+): void {
+  if (!canAnimateElement(element)) return;
 
   active.get(element)?.cancel();
 
   const animation = element.animate(cellKeyframes(effect), {
-    ...cellOptions(effect),
+    duration: cellDuration(effect, scale),
     delay,
+    easing: cellEasing(effect),
     fill: "none",
   });
   active.set(element, animation);
+  track(animation);
 }
 
 /**
- * Cross-fades a captured cell from its old owner colour to the new one. The
- * first keyframe is held through the delay (while the orb is still in the air),
- * so the colour visibly changes only when the orb lands.
+ * Cross-fades a captured cell from its old owner colour to the new one. It is
+ * started when the orb lands, so the colour visibly changes on arrival.
  */
 function takeover(
   cell: HTMLElement,
   fromColor: string,
   toColor: string,
-  delay: number,
+  duration: number,
+  track: Tracker,
 ): void {
-  if (!canAnimate(cell)) return;
+  if (!canAnimateElement(cell)) return;
 
-  cell.animate(
+  takeovers.get(cell)?.cancel();
+
+  const animation = cell.animate(
     [
       {
         backgroundColor: fromColor,
@@ -114,29 +197,35 @@ function takeover(
       },
     ],
     {
-      duration: 260,
-      delay,
+      duration,
       easing: "cubic-bezier(.2,.7,.3,1)",
       fill: "backwards",
     },
   );
+  takeovers.set(cell, animation);
+  track(animation);
 }
 
-/** Hides the freshly added orb until the flying orb lands, then pops it in. */
-function revealOrb(cell: HTMLElement, orbs: number, delay: number): void {
+/** Pops the freshly added orb in once the flying orb has landed. */
+function revealOrb(
+  cell: HTMLElement,
+  orbs: number,
+  duration: number,
+  track: Tracker,
+): void {
   const index = orbs - 1;
   const finalOrbs = Number(cell.dataset.orbs);
   if (!Number.isFinite(finalOrbs) || index < 0 || index >= finalOrbs) return;
 
   const orb = cell.querySelectorAll<HTMLElement>(".orb")[index];
-  if (orb === undefined || !canAnimate(orb)) return;
+  if (orb === undefined || !canAnimateElement(orb)) return;
 
-  orb.animate([{ opacity: 0 }, { opacity: 1 }], {
-    duration: 150,
-    delay,
+  const animation = orb.animate([{ opacity: 0 }, { opacity: 1 }], {
+    duration,
     easing: "ease-out",
     fill: "backwards",
   });
+  track(animation);
 }
 
 function createLayer(): HTMLDivElement {
@@ -149,19 +238,13 @@ function createLayer(): HTMLDivElement {
   return layer;
 }
 
-function disposeLayer(layer: HTMLDivElement, after: number): void {
-  window.setTimeout(() => {
-    layer.remove();
-    if (fxLayer === layer) fxLayer = null;
-  }, Math.max(after, 400) + 80);
-}
-
 function ringAt(
   rect: DOMRect,
   color: string,
   delay: number,
   duration: number,
   layer: HTMLDivElement,
+  track: Tracker,
 ): void {
   if (rect.width <= 0 || rect.height <= 0) return;
 
@@ -189,6 +272,7 @@ function ringAt(
     },
   );
   animation.onfinish = () => ring.remove();
+  track(animation);
 }
 
 interface OrbPaint {
@@ -243,7 +327,9 @@ function jumpOrb(
   to: HTMLElement,
   color: string,
   delay: number,
+  duration: number,
   layer: HTMLDivElement,
+  track: Tracker,
 ): void {
   const fromRect = from.getBoundingClientRect();
   const toRect = to.getBoundingClientRect();
@@ -309,112 +395,212 @@ function jumpOrb(
       },
     ],
     {
-      duration: FLIGHT_MS,
+      duration,
       delay,
       easing: "cubic-bezier(.24,.72,.32,1)",
     },
   );
   animation.onfinish = () => orb.remove();
+  track(animation);
+}
+
+interface Clock {
+  readonly cancelled: boolean;
+  wait(ms: number): Promise<boolean>;
+  cancel(): void;
+}
+
+function createClock(): Clock {
+  let cancelled = false;
+  const timeouts = new Set<ReturnType<typeof setTimeout>>();
+  const waiters = new Set<() => void>();
+
+  function wait(ms: number): Promise<boolean> {
+    if (cancelled) return Promise.resolve(false);
+
+    return new Promise<boolean>((resolve) => {
+      let settled = false;
+      let timer: ReturnType<typeof setTimeout>;
+
+      const finish = (value: boolean): void => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        timeouts.delete(timer);
+        waiters.delete(cancelWait);
+        resolve(value);
+      };
+
+      const cancelWait = (): void => finish(false);
+      timer = setTimeout(() => finish(true), ms);
+      timeouts.add(timer);
+      waiters.add(cancelWait);
+    });
+  }
+
+  function cancel(): void {
+    if (cancelled) return;
+    cancelled = true;
+    for (const timer of timeouts) clearTimeout(timer);
+    timeouts.clear();
+    for (const waiter of [...waiters]) waiter();
+    waiters.clear();
+  }
+
+  return {
+    get cancelled() {
+      return cancelled;
+    },
+    wait,
+    cancel,
+  };
 }
 
 /**
- * Replays engine events as short visual flourishes. The board is already
- * rendered from the final state, so a dropped or skipped animation can never
- * desynchronise the DOM from the model.
+ * Replays a move from its pre-move state, one explosion at a time. Each group
+ * (an `explode` plus the transfers it launches) is applied to a private clone
+ * and rendered as it happens, so the board never jumps to the final cascade.
  */
-export function playEvents(events: GameEvent[], view: BoardView): void {
-  if (prefersReducedMotion()) return;
-  if (typeof document === "undefined" || typeof window === "undefined") return;
-  if (!canAnimate(view.element)) return;
+export function playEvents(
+  preState: GameState,
+  events: GameEvent[],
+  view: BoardView,
+  callbacks: ReplayCallbacks,
+): ReplayHandle | null {
+  if (!canPlayEvents(view)) return null;
 
+  const groups = groupEvents(events);
+  if (groups.length === 0) return null;
+
+  const work = cloneState(preState);
   const layer = createLayer();
-  let step = -1;
-  let lane = 0;
-  let flights = 0;
-  let cellEffects = 0;
-  let transferEffects = 0;
-  let lastEnd = 0;
+  const clock = createClock();
+  const scale = timingScale(groups);
+  const animations = new Set<Animation>();
+  let finished = false;
 
-  const mark = (end: number): void => {
-    if (end > lastEnd) lastEnd = end;
+  const track: Tracker = (animation) => {
+    animations.add(animation);
   };
 
-  for (const event of events) {
-    switch (event.type) {
-      case "place":
-      case "add": {
-        if (cellEffects >= MAX_CELL_EFFECTS) break;
-        const cell = view.elementFor(event.at);
+  const cleanup = (): void => {
+    layer.remove();
+    if (fxLayer === layer) fxLayer = null;
+    animations.clear();
+  };
+
+  const finish = (): void => {
+    if (finished) return;
+    finished = true;
+    cleanup();
+    callbacks.done();
+  };
+
+  async function runCascade(): Promise<void> {
+    for (const group of groups) {
+      if (clock.cancelled) return;
+
+      if (group.lead.type === "place" || group.lead.type === "add") {
+        applyGameEvent(work, group.lead);
+        callbacks.render(work);
+
+        const cell = view.elementFor(group.lead.at);
         if (cell !== null) {
-          animateCell(cell, event.type, 0);
-          cellEffects += 1;
+          animateCell(cell, group.lead.type, 0, scale, track);
         }
-        break;
+        if (!(await clock.wait(scaled(PLACE_HOLD_MS, scale)))) return;
+        continue;
       }
 
-      case "explode": {
-        step += 1;
-        lane = 0;
-        if (cellEffects >= MAX_CELL_EFFECTS) break;
+      applyGameEvent(work, group.lead);
+      callbacks.render(work);
 
-        const delay = stepDelay(step);
-        const cell = view.elementFor(event.at);
-
-        if (cell !== null) {
-          animateCell(cell, "explode", delay);
-          ringAt(
-            cell.getBoundingClientRect(),
-            view.playerColor(event.player),
-            delay,
-            FLIGHT_MS * 1.3,
-            layer,
-          );
-          cellEffects += 1;
-        }
-        mark(delay + FLIGHT_MS * 1.3);
-        break;
+      const source = view.elementFor(group.lead.at);
+      if (source !== null) {
+        animateCell(source, "explode", 0, scale, track);
+        ringAt(
+          source.getBoundingClientRect(),
+          view.playerColor(group.lead.player),
+          0,
+          scaled(RING_MS, scale),
+          layer,
+          track,
+        );
       }
 
-      case "transfer": {
-        if (transferEffects >= MAX_TRANSFER_EFFECTS) break;
-        const destination = view.elementFor(event.to);
-        if (destination === null) break;
-        transferEffects += 1;
+      const stagger = Math.max(1, scaled(TRANSFER_STAGGER_MS, scale));
+      const flight = scaled(FLIGHT_MS, scale);
+      const landingDuration = scaled(TAKEOVER_MS, scale);
+      const revealDuration = scaled(ORB_REVEAL_MS, scale);
 
-        const delay = stepDelay(step) + 30 + Math.min(lane, 4) * 16;
-        lane += 1;
+      const landings = group.transfers.map(async (transfer, index) => {
+        const delay = index * stagger;
+        const destination = view.elementFor(transfer.to);
+        if (destination === null) return;
 
-        const landing = delay + FLIGHT_MS * 0.86;
-        const color = view.playerColor(event.player);
-        const destinationRect = destination.getBoundingClientRect();
+        const color = view.playerColor(transfer.player);
+        if (source !== null) {
+          jumpOrb(source, destination, color, delay, flight, layer, track);
+        }
 
-        if (event.captured && event.capturedFrom !== null) {
+        if (!(await clock.wait(delay + flight))) return;
+
+        applyGameEvent(work, transfer);
+        callbacks.render(work);
+
+        if (transfer.captured && transfer.capturedFrom !== null) {
           takeover(
             destination,
-            view.playerColor(event.capturedFrom),
+            view.playerColor(transfer.capturedFrom),
             color,
-            landing,
+            landingDuration,
+            track,
           );
         }
+        revealOrb(destination, transfer.orbs, revealDuration, track);
+        ringAt(
+          destination.getBoundingClientRect(),
+          color,
+          0,
+          scaled(RING_MS, scale),
+          layer,
+          track,
+        );
+      });
 
-        revealOrb(destination, event.orbs, landing + 40);
-        ringAt(destinationRect, color, landing, 340, layer);
+      const lastStart =
+        group.transfers.length === 0
+          ? 0
+          : (group.transfers.length - 1) * stagger;
+      const groupEnd =
+        Math.max(
+          scaled(EXPLODE_PULSE_MS, scale),
+          lastStart + flight + landingDuration,
+        ) + scaled(LANDING_HOLD_MS, scale);
 
-        const source = view.elementFor(event.from);
-        if (source !== null && flights < MAX_FLIGHTS) {
-          jumpOrb(source, destination, color, delay, layer);
-          flights += 1;
-        }
-
-        mark(delay + FLIGHT_MS + 120);
-        break;
-      }
-
-      case "cascade-limit":
-      case "win":
-        break;
+      if (!(await clock.wait(groupEnd))) return;
+      await Promise.all(landings);
     }
+
+    if (clock.cancelled) return;
+    finish();
   }
 
-  disposeLayer(layer, lastEnd);
+  void runCascade();
+
+  return {
+    cancel(): void {
+      if (finished) return;
+      finished = true;
+      clock.cancel();
+      for (const animation of animations) {
+        try {
+          animation.cancel();
+        } catch {
+          // The animation may already have finished and been detached.
+        }
+      }
+      cleanup();
+    },
+  };
 }

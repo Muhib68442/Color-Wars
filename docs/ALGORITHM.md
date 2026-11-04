@@ -324,9 +324,9 @@ function, which keeps tests deterministic.
 `GameState.botPlayer` is persisted with the save, so resuming a match restores
 the AI seat exactly. When it is the Bot's turn the board ignores input and
 removes its tab stop; after `BOT_THINK_MS` (600 ms) the controller applies the
-chosen move, plays the normal cascade events, saves, and schedules the next turn
-if the Bot still owns it. Returning from a dialog uses a shorter
-`BOT_RESUME_MS` (350 ms) delay.
+chosen move, saves it, and replays the cascade events one explosion at a time.
+The next turn (or the next Bot move) is only scheduled after that replay
+finishes. Returning from a dialog uses a shorter `BOT_RESUME_MS` (350 ms) delay.
 
 ---
 
@@ -492,12 +492,23 @@ function applyMove(state, cell, options):
 Renderers then:
 
 1. apply the move and receive `events`;
-2. replay `Explode` / `Transfer` events as animations (or instantly);
-3. redraw from the model;
-4. show the turn banner, and a win overlay when `state.gameOver`.
+2. clone the pre-move state and group `events` into a `place`/`add` step and one
+   step per explosion (`explode` + its transfers);
+3. apply each group to the clone, render that intermediate `GameState`, and wait
+   for its flights/landings before starting the next explosion;
+4. render once more from the final model, show the turn banner, and show a win
+   overlay when `state.gameOver`.
 
-This removes the ghost-coin class of bug entirely: the DOM or Pygame surface is
-always rebuilt from the model, never patched ad hoc.
+`src/ui/replay.ts` owns the event-to-board replay (`applyGameEvent`,
+`groupEvents`, `replayEvents`) so the visual order matches the engine order
+exactly. `src/ui/animations.ts` plays the groups; `src/ui/app.ts` locks input and
+Bot scheduling until the replay completes, and cancels a stale replay when the
+player leaves the match or starts a new game.
+
+This removes the ghost-coin class of bug entirely: the DOM is always rebuilt
+from a model snapshot, never patched ad hoc. If Web Animations is unavailable or
+reduced motion is requested, the UI skips the intermediate steps and renders the
+final state once.
 
 The Bot reuses the same `applyMove` (on cloned states) for every candidate and
 reply, so its search and the real turn can never disagree about the rules.

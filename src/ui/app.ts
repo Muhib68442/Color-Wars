@@ -6,6 +6,7 @@ import {
   MAX_GRID_SIZE,
   MIN_GRID_SIZE,
   type CellRef,
+  type GameEvent,
   type GameState,
   type Player,
   type PlayerCount,
@@ -20,7 +21,7 @@ import {
 } from "../platform/settings.js";
 import type { Sound } from "../platform/sound.js";
 import type { StorageAdapter } from "../platform/storage.js";
-import { playEvents } from "./animations.js";
+import { playEvents, type ReplayHandle } from "./animations.js";
 import { createBoardView } from "./boardView.js";
 import { createHud } from "./hud.js";
 import { createOverlay } from "./overlay.js";
@@ -68,6 +69,9 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
   let screen: ScreenName = "home";
   let infoReturn: "home" | "game" = "home";
   let botTimer: ReturnType<typeof setTimeout> | null = null;
+  let animating = false;
+  let replay: ReplayHandle | null = null;
+  let replayToken: object | null = null;
 
   const profiles = () => settings.profiles;
 
@@ -79,7 +83,7 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
     {
       getProfiles: profiles,
       getBotPlayer: () => state.botPlayer,
-      isInputLocked: isBotTurn,
+      isInputLocked: () => isBotTurn() || animating,
     },
   );
 
@@ -137,25 +141,28 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
     const move = chooseBotMove(state, { difficulty: settings.difficulty });
     if (move === null) return;
 
-    const result = applyMove(state, move);
+    const before = state;
+    const result = applyMove(before, move);
     if (!result.accepted) return;
 
     state = result.state;
     hasSave = true;
-    render();
-    playEvents(result.events, board);
+    hud.render(state);
+    updateHome();
     playMoveSound(
       state.gameOver,
       result.events.some((event) => event.type === "explode"),
     );
     storage.save(state);
 
-    if (state.gameOver) {
-      showResult();
-      return;
-    }
-
-    scheduleBotMove();
+    animateCascade(before, result.events, () => {
+      if (screen !== "game") return;
+      if (state.gameOver) {
+        showResult();
+        return;
+      }
+      scheduleBotMove();
+    });
   }
 
   function nameOf(player: Player): string {
@@ -238,6 +245,63 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
     updateHome();
   }
 
+  /**
+   * Stops a running cascade replay. The model is already at its final state, so
+   * an interruption can render the settled board immediately.
+   */
+  function cancelReplay(renderFinal = true): void {
+    const handle = replay;
+    const wasActive = animating || handle !== null;
+    replay = null;
+    replayToken = null;
+    animating = false;
+    handle?.cancel();
+    if (renderFinal && wasActive) render();
+  }
+
+  /**
+   * Plays the visible part of a move from `preState`, then runs the turn's
+   * continuation (result dialog or Bot scheduling) once the board settles.
+   */
+  function animateCascade(
+    preState: GameState,
+    events: GameEvent[],
+    after: () => void,
+  ): void {
+    replay?.cancel();
+    replay = null;
+
+    const token = {};
+    replayToken = token;
+    animating = true;
+
+    const handle = playEvents(preState, events, board, {
+      render: (snapshot) => {
+        if (replayToken !== token) return;
+        board.render(snapshot);
+      },
+      done: () => {
+        if (replayToken !== token) return;
+        replayToken = null;
+        replay = null;
+        animating = false;
+        render();
+        after();
+      },
+    });
+
+    if (handle === null) {
+      if (replayToken !== token) return;
+      replayToken = null;
+      animating = false;
+      render();
+      after();
+      return;
+    }
+
+    replay = handle;
+  }
+
   function showScreen(next: ScreenName): void {
     screen = next;
     shell.home.hidden = next !== "home";
@@ -246,7 +310,10 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
     shell.settings.hidden = next !== "settings";
     shell.about.hidden = next !== "about";
 
-    if (next !== "game") clearBotTimer();
+    if (next !== "game") {
+      clearBotTimer();
+      cancelReplay();
+    }
 
     if (next === "home") {
       if (!shell.resumeButton.disabled) shell.resumeButton.focus();
@@ -376,10 +443,11 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
   }
 
   function selectCell(ref: CellRef): boolean {
-    if (screen !== "game" || overlay.isOpen()) return false;
+    if (screen !== "game" || overlay.isOpen() || animating) return false;
     if (isBotTurn()) return false;
 
-    const result = applyMove(state, ref);
+    const before = state;
+    const result = applyMove(before, ref);
 
     if (!result.accepted) {
       if (settings.vibration) haptics?.reject();
@@ -389,8 +457,8 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
 
     state = result.state;
     hasSave = true;
-    render();
-    playEvents(result.events, board);
+    hud.render(state);
+    updateHome();
     if (settings.vibration) haptics?.tap();
     playMoveSound(
       state.gameOver,
@@ -398,12 +466,16 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
     );
     storage.save(state);
 
-    if (state.gameOver) showResult();
-    else scheduleBotMove();
+    animateCascade(before, result.events, () => {
+      if (screen !== "game") return;
+      if (state.gameOver) showResult();
+      else scheduleBotMove();
+    });
     return true;
   }
 
   function newGame(): void {
+    cancelReplay(false);
     clearBotTimer();
     overlay.close();
     state = createGame(
@@ -455,6 +527,13 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
 
   function openMenu(): void {
     clearBotTimer();
+    if (animating) {
+      cancelReplay();
+      if (state.gameOver) {
+        showResult();
+        return;
+      }
+    }
     overlay.open({
       eyebrow: "Game menu",
       title: "Paused",

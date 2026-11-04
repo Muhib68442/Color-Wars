@@ -379,7 +379,8 @@ remote font request, so the app works offline.
 - Text: `Player N to move`, `<custom name> to move`, `Player N · solo
   practice`, `Bot is thinking…`, `<name> wins!`, or `It's a draw.`
 - While the Bot owns the turn, every board cell is removed from the tab order and
-  input is ignored until the Bot has moved.
+  input is ignored until the Bot has moved. Input is also ignored while a cascade
+  replay is still playing, so a second tap cannot start another turn mid-cascade.
 - `role="status"` and `aria-live="polite"` announce every turn change and the
   result to screen readers.
 - The menu button opens the in-match dialog (Keep playing, Restart match,
@@ -553,17 +554,19 @@ Behaviour:
 | Legal target | Pointer cursor, hover ring, press scale |
 | Illegal target | No pointer, `aria-disabled="true"` |
 | Active player | Card tint + ring + "playing" pill, coloured plain-text status |
-| Explosion | Source cell flashes and a coloured ring expands; orbs hop out |
+| Explosion | Source cell flashes and a coloured ring expands; orbs hop out one group at a time |
 | Transfer | Orb clone arcs to the target; the new orb pops in under a landing ring |
-| Capture | Target keeps the old owner colour while the orb flies, then takes the new colour |
+| Capture | Target keeps the old owner colour while the orb flies, then cross-fades to the new colour when the orb lands |
+| Cascade replay | Each explosion waits for the previous group's flights and takeovers, then the next cell starts |
 | Win | Status text + modal dialog; board locked |
 | Solo mode | One score card, status reads `Player N · solo practice`, never ends |
 | Bot turn | Status reads `Bot is thinking…`; board tab stops removed until the move lands |
 | Bot seat | Name shows `Bot` on the board, score card, and settings row; name field disabled |
 | Saved game | Restored on launch behind the home screen |
 
-Because the board is re-rendered from `GameState` after every move, the DOM can
-never show an orb the model does not contain (the legacy "ghost coin" bug).
+Because the board is re-rendered from `GameState` after every replayed cascade
+group (and once more from the final state), the DOM can never show an orb the
+model does not contain (the legacy "ghost coin" bug).
 
 ---
 
@@ -584,27 +587,38 @@ never show an orb the model does not contain (the legacy "ghost coin" bug).
 - **Menu:** **How to play** opens the rules; **Restart match** asks for
   confirmation before clearing the board; **Back to home** keeps the save.
 - **Illegal actions** (enemy cell, out of bounds, after game over, while a
-  dialog is open, outside the match screen, or while the Bot is thinking) are
-  ignored; the turn does not change and nothing is saved.
+  dialog is open, outside the match screen, while the Bot is thinking, or while
+  a cascade replay is playing) are ignored; the turn does not change and nothing
+  is saved.
 - **Haptics:** a short vibration on accepted moves and a slightly longer one on
   rejected moves where the platform supports `navigator.vibrate`; suppressed
   while the Vibration setting is off and silently skipped where unsupported.
 - **Sound:** place, explosion, win, and reject cues through the Web Audio API;
   suppressed while the Sound setting is off.
-- **Animations:** place, add, explode, and transfer events are replayed as short
-  Web Animations effects.
-  - Each explosion flashes its source cell and emits an expanding ring in the
-    detonating player's colour.
-  - Every transfer launches an orb clone from the source to each neighbour on a
-    short curved hop (a sideways bulge plus an upward lift, so even orthogonal
-    moves read as diagonal jumps).
-  - The freshly added orb is hidden until the clone lands, then fades in.
-  - On capture, the destination cell holds its previous owner's colour for the
-    duration of the flight and then cross-fades to the new owner's colour, so
-    the colour visibly changes when the orb arrives.
-  - All effects are skipped entirely when `prefers-reduced-motion: reduce` is
-    set, and the board is still rendered from the final state, so animations can
-    never leave the DOM out of sync with the model.
+- **Animations:** the UI replays the engine's event stream from the pre-move
+  board instead of rendering the final cascade up front. `src/ui/replay.ts`
+  groups the events into one `place`/`add` step followed by one step per
+  explosion (that `explode` plus the transfers it launched).
+  - Each explosion flashes its source cell, empties it, and emits an expanding
+    ring in the detonating player's colour.
+  - Transfers leave the source on a slow curved hop (560 ms base) with a short
+    stagger between neighbours. Each arriving orb is applied to the replay
+    snapshot only when its clone lands.
+  - The freshly added orb fades in under a landing ring. On capture, the
+    destination keeps its previous owner's colour for the whole flight and then
+    cross-fades to the new owner's colour.
+  - An explosion that was triggered by the previous transfers waits until every
+    flight in the current group has landed, so chains play one cell at a time:
+    step 1 finishes → step 2 starts → step 3 starts, and so on.
+  - The board renders an intermediate `GameState` after every group and transfer,
+    and input, focus, and Bot scheduling stay paused until the full replay
+    completes. Leaving the match, opening the menu, or starting a new game
+    cancels the replay and immediately renders the already-computed final state.
+  - Long cascades are compressed into a ~20 s budget rather than locking the UI
+    for minutes; short cascades keep the deliberately slow, followable pace.
+  - All effects are skipped entirely when `prefers-reduced-motion: reduce` is set
+    or Web Animations is unavailable; the board is rendered once from the final
+    state, so animations can never leave the DOM out of sync with the model.
 
 ---
 
