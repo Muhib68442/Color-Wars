@@ -584,6 +584,9 @@ describe("how to play and about", () => {
     expect(screenIs(root, "about")).toBe(true);
     expect(root.querySelector("#about-title")?.textContent).toBe("About");
     expect(root.querySelector(".about__name")?.textContent).toBe("Color Wars");
+    expect(root.querySelector(".about__version")?.textContent).toBe(
+      `Version ${__APP_VERSION__}`,
+    );
 
     button(root, "about-back").click();
     expect(app.getScreen()).toBe("home");
@@ -808,6 +811,53 @@ describe("game menu", () => {
     resumeMatch(root);
     expect(app.getScreen()).toBe("game");
     expect(status(root)).toBe("Player 2 to move");
+  });
+});
+
+describe("Android back button", () => {
+  it("closes an open dialog before handling the match", () => {
+    const { root, app } = mount();
+    startMatch(root);
+    cellButton(root, 0, 0).click();
+
+    button(root, "menu").click();
+    expect(overlay(root).hasAttribute("open")).toBe(true);
+
+    expect(app.handleBack()).toBe(true);
+    expect(overlay(root).hasAttribute("open")).toBe(false);
+    expect(app.getScreen()).toBe("game");
+    expect(app.getState().moveCount).toBe(1);
+  });
+
+  it("opens the pause menu from a live match", () => {
+    const { root, app } = mount();
+    startMatch(root);
+
+    expect(app.handleBack()).toBe(true);
+    expect(overlay(root).hasAttribute("open")).toBe(true);
+    expect(overlayTitle(root)).toBe("Paused");
+  });
+
+  it("returns from information screens and lets home exit", () => {
+    const { root, app } = mount();
+
+    button(root, "about").click();
+    expect(app.getScreen()).toBe("about");
+    expect(app.handleBack()).toBe(true);
+    expect(app.getScreen()).toBe("home");
+
+    expect(app.handleBack()).toBe(false);
+  });
+
+  it("returns from How to play to the match", () => {
+    const { root, app } = mount();
+    startMatch(root);
+    button(root, "menu").click();
+    action(root, "How to play").click();
+
+    expect(app.getScreen()).toBe("info");
+    expect(app.handleBack()).toBe(true);
+    expect(app.getScreen()).toBe("game");
   });
 });
 

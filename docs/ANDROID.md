@@ -4,9 +4,13 @@ This document is the contract for turning Color Wars into a stable Android app.
 It covers what "any Android" realistically means, how the APK is built, how every
 game feature maps to the Android shell, and the tests that gate a release.
 
-> **Status:** plan. The engine, UI, settings, and save/resume are complete (see
-> [`ARCHITECTURE.md`](ARCHITECTURE.md) §4.4). The Capacitor shell is Phase 3.
-> Nothing in this document is shipped yet.
+> **Status:** integration-ready. The engine, UI, settings, and save/resume are
+> complete. The Capacitor configuration, app icon sources, versioning, and
+> back-button controller are prepared. The Android toolchain is not installed
+> and `android/` has not been generated yet.
+>
+> For the exact Windows commands and the future release checklist, use
+> [`RELEASE.md`](RELEASE.md).
 
 ---
 
@@ -111,7 +115,7 @@ One-time setup checklist:
 import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
-  appId: "com.<yourname>.colorwars", // permanent; changing it creates a new app
+  appId: "com.muhib.colorwars", // permanent; changing it creates a new app
   appName: "Color Wars",
   webDir: "dist",
   server: {
@@ -445,9 +449,9 @@ build. Debug builds are debuggable, larger, and signed with a throwaway key.
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "android:sync": "npm run build && cap sync android",
-    "android:debug": "npm run android:sync && cd android && gradlew.bat assembleDebug",
-    "android:release": "npm run android:sync && cd android && gradlew.bat bundleRelease"
+    "android:assets": "npx @capacitor/assets generate --android --iconBackgroundColor \"#f3f3f6\" --iconBackgroundColorDark \"#0f1115\" --splashBackgroundColor \"#f3f3f6\" --splashBackgroundColorDark \"#0f1115\"",
+    "android:sync": "npm run build && npx cap sync android",
+    "android:debug": "npm run android:sync && cd android && gradlew.bat assembleDebug"
   }
 }
 ```
@@ -517,13 +521,20 @@ Enable R8 later only with a tested `mapping.txt` and a plugin smoke test.
 
 ```groovy
 defaultConfig {
-    versionCode 1          // integer, must increase every upload
-    versionName "1.0.0"    // user-visible
+    versionCode 10001      // integer, must increase every upload
+    versionName "1.0.1"    // user-visible
 }
 ```
 
-Bump `versionCode` for every Play upload. Optionally generate both from
-`package.json` in CI, but keep the mapping recorded per release.
+This project derives both from `package.json` `version` instead of keeping a
+second copy in Gradle (see [`RELEASE.md`](RELEASE.md) §3.1):
+
+- `versionName` = `package.json` `version` (`1.0.1`).
+- `versionCode` = `major*10000 + minor*100 + patch` (`1.0.1` → `10001`).
+- The About screen uses the same version through Vite's `__APP_VERSION__`.
+
+Bump `package.json` for every release. Never upload the same `versionCode`
+twice; keep the mapping recorded per release.
 
 ### 8.5 Verify the artifact
 
@@ -683,9 +694,16 @@ The Android app is releasable when:
 ## 15. Current environment notes
 
 - Node 22.20 and npm 10.9 are installed.
-- Oracle JDK 19 is installed but **should not** be used for Gradle; install
-  Android Studio and use its JDK 21.
-- Android Studio, the Android SDK, `adb`, and `gradle` are **not installed yet**.
+- Android Studio 2022.3 and its bundled JDK 17 are installed at
+  `F:\Software Program Data\Android Studio`; the bundled JDK is **not** used
+  because Capacitor 8 needs JDK 21.
+- Oracle JDK 19 is installed but **must not** be used for Gradle.
+- Android SDK, `adb`, Gradle, and the `android/` project are **not installed or
+  generated yet**.
+- C: has about 6 GB free, so install the portable JDK/SDK and set
+  `GRADLE_USER_HOME` on F:.
 - The engine, UI, settings, and save/resume work (Phase 0–2.5) and `dist/`
-  builds, so the shell can be generated as soon as the Android toolchain is
-  installed.
+  builds. The Capacitor configuration, icon sources, versioning, and back-button
+  controller are ready.
+- Follow [`RELEASE.md`](RELEASE.md) §2–§3 for the one-time setup, then §4 to
+  produce the first debug APK.

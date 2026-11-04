@@ -49,6 +49,8 @@ export interface App {
   newGame(): void;
   requestNewGame(): void;
   persist(): void;
+  /** Consume the Android back button, or return false to let the OS exit. */
+  handleBack(): boolean;
 }
 
 export function createApp(root: HTMLElement, options: AppOptions): App {
@@ -571,6 +573,31 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
     });
   }
 
+  function handleBack(): boolean {
+    if (overlay.isOpen()) {
+      overlay.close();
+      return true;
+    }
+
+    if (screen === "game") {
+      openMenu();
+      return true;
+    }
+
+    if (screen === "info") {
+      showScreen(infoReturn);
+      return true;
+    }
+
+    if (screen === "settings" || screen === "about") {
+      showScreen("home");
+      return true;
+    }
+
+    // On the home screen the OS should close the app.
+    return false;
+  }
+
   function changeGridAxis(axis: "rows" | "cols", delta: number): void {
     const key = axis === "rows" ? "gridRows" : "gridCols";
     const current = settings[key];
@@ -745,6 +772,7 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
     selectCell,
     newGame,
     requestNewGame,
+    handleBack,
     persist: () => {
       if (hasSave) storage.save(state);
     },

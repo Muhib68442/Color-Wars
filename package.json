@@ -1,7 +1,7 @@
 {
   "name": "color-wars",
   "private": true,
-  "version": "0.2.0",
+  "version": "1.0.1",
   "type": "module",
   "description": "A local chain reaction game for one to four players on web and Android.",
   "scripts": {
@@ -9,7 +9,10 @@
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "android:assets": "npx @capacitor/assets generate --android --iconBackgroundColor \"#f3f3f6\" --iconBackgroundColorDark \"#0f1115\" --splashBackgroundColor \"#f3f3f6\" --splashBackgroundColorDark \"#0f1115\"",
+    "android:sync": "npm run build && npx cap sync android",
+    "android:debug": "npm run android:sync && cd android && gradlew.bat assembleDebug"
   },
   "devDependencies": {
     "jsdom": "^29.1.1",

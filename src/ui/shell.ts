@@ -412,7 +412,7 @@ const SHELL_TEMPLATE = /* html */ `
       <div class="about__brand">
         <div class="about__logo">${LOGO}</div>
         <h3 class="about__name">Color Wars</h3>
-        <p class="about__version">Version 0.2.0</p>
+        <p class="about__version">Version ${__APP_VERSION__}</p>
       </div>
 
       <p>
