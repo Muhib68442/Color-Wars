@@ -13,10 +13,9 @@ in `legacy/main.py` is archived for reference and is no longer maintained.
 
 > **Status: playable web build.** The pure engine, home/menu flow, settings,
 > light/dark themes, multi-player boards, save/resume, and the Bot opponent are
-> complete and covered by 126 Vitest tests. Phase 3 wraps the Vite build in a
-> Capacitor Android shell; the integration files are ready and the toolchain
-> install is the next step. Phase 4 handles signing and release. See the
-> [roadmap](#roadmap).
+> complete and covered by 126 Vitest tests. The Capacitor Android shell is in
+> place and the `1.0.1` debug APK builds; device testing and release signing are
+> next. See the [roadmap](#roadmap).
 
 ---
 
@@ -181,7 +180,7 @@ regression coverage in the test suite.
 | 2 | rebuild the UI on the engine: visible turn banner, win overlay, restart, save/resume, accessibility | done |
 | 2.5 | home menu, settings, light/dark themes, 1–4 players, dynamic grids, names/colours, sound and vibration toggles | done |
 | 2.6 | Bot opponent with Easy/Medium/Hard difficulty, stacking/attack heuristic, 2-ply Hard search, fixed `Bot` name, save-resumable AI seat | done |
-| 3 | Capacitor 8 shell, Android project, Preferences persistence hardening, device matrix | integration files ready; toolchain install next |
+| 3 | Capacitor 8 shell, Android project, Preferences persistence hardening, device matrix | debug APK built; device test pending |
 | 4 | signing, release build, Play checklist, hardening | planned |
 
 Definition of "stable" for the Android release: see

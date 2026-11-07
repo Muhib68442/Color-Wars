@@ -4,10 +4,9 @@ This document is the contract for turning Color Wars into a stable Android app.
 It covers what "any Android" realistically means, how the APK is built, how every
 game feature maps to the Android shell, and the tests that gate a release.
 
-> **Status:** integration-ready. The engine, UI, settings, and save/resume are
-> complete. The Capacitor configuration, app icon sources, versioning, and
-> back-button controller are prepared. The Android toolchain is not installed
-> and `android/` has not been generated yet.
+> **Status:** built. The engine, UI, settings, and save/resume are complete.
+> The Capacitor shell, app icon, versioning, and back-button controller are in
+> place, and the `1.0.1` debug APK has been produced.
 >
 > For the exact Windows commands and the future release checklist, use
 > [`RELEASE.md`](RELEASE.md).
@@ -694,16 +693,16 @@ The Android app is releasable when:
 ## 15. Current environment notes
 
 - Node 22.20 and npm 10.9 are installed.
+- JDK 21 is at `F:\Software Program Data\JDK21`.
+- Android SDK is at `F:\Software Program Data\Android SDK` with Platform 36,
+  Build-Tools 35.0.0, Platform-Tools, and accepted licences. `adb` is installed.
+- Gradle 8.14.3 and its cache live in `F:\gradle-home`.
 - Android Studio 2022.3 and its bundled JDK 17 are installed at
   `F:\Software Program Data\Android Studio`; the bundled JDK is **not** used
   because Capacitor 8 needs JDK 21.
 - Oracle JDK 19 is installed but **must not** be used for Gradle.
-- Android SDK, `adb`, Gradle, and the `android/` project are **not installed or
-  generated yet**.
-- C: has about 6 GB free, so install the portable JDK/SDK and set
-  `GRADLE_USER_HOME` on F:.
 - The engine, UI, settings, and save/resume work (Phase 0–2.5) and `dist/`
-  builds. The Capacitor configuration, icon sources, versioning, and back-button
-  controller are ready.
-- Follow [`RELEASE.md`](RELEASE.md) §2–§3 for the one-time setup, then §4 to
-  produce the first debug APK.
+  builds. The Capacitor shell, icon sources, versioning, and back-button
+  controller are in place, and the `1.0.1` debug APK is built.
+- Follow [`RELEASE.md`](RELEASE.md) §2 for the environment variables, §4 to
+  rebuild, and §6 for the next release.

@@ -2,6 +2,7 @@ import "./styles/tokens.css";
 import "./styles/app.css";
 
 import { createHaptics } from "./platform/haptics.js";
+import { installBackButton } from "./platform/backButton.js";
 import { createSettingsStore } from "./platform/settings.js";
 import { createSound } from "./platform/sound.js";
 import { browserStore, createStorage } from "./platform/storage.js";
@@ -21,6 +22,8 @@ const app = createApp(root, {
   haptics: createHaptics(),
   sound: createSound(),
 });
+
+installBackButton(() => app.handleBack());
 
 function persist(): void {
   app.persist();

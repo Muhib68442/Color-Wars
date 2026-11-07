@@ -4,9 +4,12 @@ This is the practical, machine-specific runbook for building Color Wars as an
 Android APK. The design contract, supported versions, and device matrix live in
 [`ANDROID.md`](ANDROID.md); this file is the copy-paste checklist.
 
-> **Status:** the web app and Android integration files are ready, but the
-> Android toolchain is **not installed** and `android/` has **not** been
-> generated. No APK exists yet. Follow §2 once, then §3–§5.
+> **Status:** built. The Android project, icons, splash screens, versioning, and
+> back-button adapter are in place. The debug APK for `1.0.1` was produced and
+> verified (package `com.muhib.colorwars`, version code `10001`).
+> Follow §4 for routine rebuilds and §6 for the next release.
+>
+> Built artifact: `android/app/build/outputs/apk/debug/app-debug.apk`
 
 ---
 
@@ -124,10 +127,10 @@ sdk.dir=F:\\Android\\Sdk
 the adaptive launcher icons and splash screens. Replace those SVGs and rerun the
 command whenever the logo changes.
 
-### 3.1 Apply the version code from `package.json`
+### 3.1 Version code from `package.json` (already applied)
 
-Open `android/app/build.gradle` and add this near the top, after the `apply
-plugin` lines:
+`android/app/build.gradle` reads the repository root `package.json` so the Gradle
+version cannot drift from the web version. This is the applied configuration:
 
 ```groovy
 def packageJson = new groovy.json.JsonSlurper().parseText(
@@ -152,10 +155,10 @@ defaultConfig {
 `major.minor.patch`; do not add `-beta` suffixes because the Gradle parser
 expects integers.
 
-### 3.2 Add the Android back button
+### 3.2 Android back button (already applied)
 
 Keep the existing web platform adapters, but connect the hardware/gesture back
-button to the app controller. Create `src/platform/backButton.ts`:
+button to the app controller. `src/platform/backButton.ts` contains:
 
 ```ts
 import { App as CapacitorApp } from "@capacitor/app";
@@ -349,9 +352,12 @@ Release checklist:
 ## 7. Current machine notes
 
 - Node 22.20, npm 10.9, Chrome, and network access are available.
+- JDK 21 is at `F:\Software Program Data\JDK21`.
+- Android SDK is at `F:\Software Program Data\Android SDK` with Platform 36,
+  Build-Tools 35.0.0, and Platform-Tools; `adb` is on the SDK path.
+- Gradle 8.14.3 and the build cache live in `F:\gradle-home`.
 - Android Studio 2022.3 with JDK 17 is installed at
   `F:\Software Program Data\Android Studio`; it is **not** used by this runbook.
-- No Android SDK, `adb`, Gradle, or `android/` project exists yet.
-- C: has about 6 GB free; keep the SDK, JDK, and Gradle cache on F:.
-- The first APK cannot be produced until §2 and §3 are run. After that,
-  `npm run android:debug` is the only command needed for routine builds.
+- The `android/` project exists and `npm run android:debug` produces the debug
+  APK. The same environment variables as §2 are needed in each new shell:
+  `JAVA_HOME`, `ANDROID_HOME`, `ANDROID_SDK_ROOT`, `GRADLE_USER_HOME`, `Path`.
