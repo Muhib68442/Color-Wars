@@ -78,14 +78,14 @@
     "eyebrow": "Get the app",
     "title": "Take Color Wars with you.",
     "description": "Download the Android app, open the file and start a match. Nothing to sign up for.",
-    "url": "REPLACE_WITH_APK_URL",
+    "url": "https://muhib68442.github.io/Color-Wars/colorwars%20v1.0.2.apk",
     "buttonLabel": "Download APK",
     "comingSoonLabel": "Download coming soon",
     "note": "Open the downloaded file to install. Android may ask you to allow installs from unknown sources.",
     "metadataLabel": "Download details",
     "metadata": [
       { "label": "Version", "value": "1.0.2" },
-      { "label": "Size", "value": "~4.9 MB" },
+      { "label": "Size", "value": "~3.6 MB" },
       { "label": "Updated", "value": "2026-11-20" },
       { "label": "Requires", "value": "Android 7.0 or newer" }
     ]

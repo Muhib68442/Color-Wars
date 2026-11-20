@@ -24,20 +24,16 @@ Common edits:
 
 ### Publish the APK link
 
-`download.url` is deliberately set to `REPLACE_WITH_APK_URL`. While it is a
-placeholder the page shows a disabled **Download coming soon** button instead
-of a broken link. Replace it with the direct file URL, for example:
+`download.url` points at the APK committed alongside the site:
 
 ```json
-"url": "https://raw.githubusercontent.com/muhib68442/Color-Wars/main/docs/assets/color-wars-1.0.2.apk"
+"url": "https://muhib68442.github.io/Color-Wars/colorwars%20v1.0.2.apk"
 ```
 
-Then update `download.metadata` (version, size, updated date) and the button
-becomes active automatically.
-
-Copy the APK into `docs/assets/` if you want to host it from your own domain or
-GitHub Pages; `raw.githubusercontent.com` works for a public repository but is
-not intended as a CDN.
+The file is `docs/colorwars v1.0.2.apk`; `%20` is the URL-encoded space. The
+button is active because the URL is absolute `http(s)`. If you rename or move
+the APK, update this URL. `download.metadata` (version, size, updated date) is
+kept in sync with the file.
 
 ## Preview locally
 
