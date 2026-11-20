@@ -14,6 +14,7 @@ import {
 import type { Haptics } from "../platform/haptics.js";
 import {
   defaultSettings,
+  isExplosionStyle,
   softenColor,
   strengthenColor,
   type GameSettings,
@@ -21,6 +22,7 @@ import {
 } from "../platform/settings.js";
 import type { Sound } from "../platform/sound.js";
 import type { StorageAdapter } from "../platform/storage.js";
+import type { WakeLock } from "../platform/wakeLock.js";
 import { playEvents, type ReplayHandle } from "./animations.js";
 import { createBoardView } from "./boardView.js";
 import { createHud } from "./hud.js";
@@ -39,6 +41,7 @@ export interface AppOptions {
   settings: SettingsStore;
   haptics?: Haptics;
   sound?: Sound;
+  wakeLock?: WakeLock;
 }
 
 export interface App {
@@ -55,9 +58,16 @@ export interface App {
 
 export function createApp(root: HTMLElement, options: AppOptions): App {
   const shell = mountShell(root);
-  const { storage, settings: settingsStore, haptics, sound } = options;
+  const {
+    storage,
+    settings: settingsStore,
+    haptics,
+    sound,
+    wakeLock,
+  } = options;
 
   let settings = settingsStore.load();
+  sound?.setExplosionStyle(settings.explosionStyle);
   const loaded = storage.load();
   let hasSave = loaded !== null;
   let state: GameState =
@@ -76,6 +86,12 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
   let animating = false;
   let replay: ReplayHandle | null = null;
   let replayToken: object | null = null;
+  /**
+   * One teaching hint per player in this session: the cell they first placed.
+   * It is cleared for good when that cell detonates, so an experienced player
+   * is not nudged around the board forever.
+   */
+  const hintCells = new Map<Player, CellRef>();
 
   const profiles = () => settings.profiles;
 
@@ -149,24 +165,29 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
     const result = applyMove(before, move);
     if (!result.accepted) return;
 
+    rememberOpeningCell(before, move);
+    clearExplodedHints(result.events);
     state = result.state;
     hasSave = true;
     hud.render(state);
     updateHome();
-    playMoveSound(
-      state.gameOver,
-      result.events.some((event) => event.type === "explode"),
-    );
+    playPlacementSound("bot");
+    if (state.gameOver) playWinSound();
     storage.save(state);
 
-    animateCascade(before, result.events, () => {
-      if (screen !== "game") return;
-      if (state.gameOver) {
-        showResult();
-        return;
-      }
-      scheduleBotMove();
-    });
+    animateCascade(
+      before,
+      result.events,
+      () => {
+        if (screen !== "game") return;
+        if (state.gameOver) {
+          showResult();
+          return;
+        }
+        scheduleBotMove();
+      },
+      playExplosionSound,
+    );
   }
 
   function nameOf(player: Player): string {
@@ -271,6 +292,7 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
     preState: GameState,
     events: GameEvent[],
     after: () => void,
+    onExplode?: () => void,
   ): void {
     replay?.cancel();
     replay = null;
@@ -283,6 +305,10 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
       render: (snapshot) => {
         if (replayToken !== token) return;
         board.render(snapshot);
+      },
+      onExplode: () => {
+        if (replayToken !== token) return;
+        onExplode?.();
       },
       done: () => {
         if (replayToken !== token) return;
@@ -298,6 +324,14 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
       if (replayToken !== token) return;
       replayToken = null;
       animating = false;
+      // With animation disabled the board settles instantly, but sounds still
+      // belong with the detonations the model produced.
+      let audible = 0;
+      for (const event of events) {
+        if (event.type !== "explode" || audible >= 4) continue;
+        audible += 1;
+        onExplode?.();
+      }
       render();
       after();
       return;
@@ -308,6 +342,9 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
 
   function showScreen(next: ScreenName): void {
     screen = next;
+    // Only the board needs a wake lock; menus and the home screen may sleep.
+    if (next === "game") wakeLock?.keepAwake();
+    else wakeLock?.allowSleep();
     shell.home.hidden = next !== "home";
     shell.game.hidden = next !== "game";
     shell.info.hidden = next !== "info";
@@ -361,6 +398,12 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
       button.setAttribute("aria-pressed", active ? "true" : "false");
     }
 
+    for (const button of refs.explosionStyleButtons) {
+      const active = button.dataset.explosionStyle === settings.explosionStyle;
+      button.classList.toggle("is-selected", active);
+      button.setAttribute("aria-pressed", active ? "true" : "false");
+    }
+
     refs.difficultyBadge.textContent =
       `Bot · ${difficultyLabel(settings.difficulty)}`;
 
@@ -397,6 +440,9 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
     }
 
     refs.sound.checked = settings.sound;
+    refs.soundTap.checked = settings.soundTap;
+    refs.soundBot.checked = settings.soundBot;
+    refs.soundExplosion.checked = settings.soundExplosion;
     refs.vibration.checked = settings.vibration;
   }
 
@@ -436,15 +482,68 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
     });
   }
 
-  function playMoveSound(gameOver: boolean, exploded: boolean): void {
+  function playPlacementSound(actor: "human" | "bot"): void {
     if (!settings.sound) return;
-    if (gameOver) {
-      sound?.win();
-    } else if (exploded) {
-      sound?.explode();
-    } else {
-      sound?.place();
+    if (actor === "human") {
+      if (settings.soundTap) sound?.place();
+    } else if (settings.soundBot) {
+      sound?.botPlace();
     }
+  }
+
+  function playWinSound(): void {
+    if (settings.sound) sound?.win();
+  }
+
+  function playExplosionSound(): void {
+    if (settings.sound && settings.soundExplosion) sound?.explode();
+  }
+
+  /** Explicit preview in Settings: master Sound gates it, the per-move switch does not. */
+  function previewExplosion(): void {
+    if (!settings.sound) return;
+    sound?.explode();
+  }
+
+  /** Records the opening cell so a new Grow-mode player can be nudged back. */
+  function rememberOpeningCell(before: GameState, ref: CellRef): void {
+    const player = before.currentPlayer;
+    if (!before.hasPlayed[player] && !hintCells.has(player)) {
+      hintCells.set(player, ref);
+    }
+  }
+
+  /** Retires a hint as soon as the cell it points at detonates. */
+  function clearExplodedHints(events: GameEvent[]): void {
+    for (const event of events) {
+      if (event.type !== "explode") continue;
+      const hint = hintCells.get(event.player);
+      if (
+        hint !== undefined &&
+        hint.row === event.at.row &&
+        hint.col === event.at.col
+      ) {
+        hintCells.delete(event.player);
+      }
+    }
+  }
+
+  /**
+   * Points a Grow-mode player back to the cell they started from, until that
+   * cell bursts. Once the hint is retired there is no fallback, so the ping
+   * does not reappear on a different owned cell.
+   */
+  function growHintCells(): CellRef[] {
+    if (!state.growOnly || !state.hasPlayed[state.currentPlayer]) return [];
+    const player = state.currentPlayer;
+    const hint = hintCells.get(player);
+    if (hint === undefined) return [];
+    if (state.board[hint.row]?.[hint.col]?.owner !== player) {
+      // Captured or wiped out: the lesson is over either way.
+      hintCells.delete(player);
+      return [];
+    }
+    return [hint];
   }
 
   function selectCell(ref: CellRef): boolean {
@@ -457,25 +556,32 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
     if (!result.accepted) {
       if (settings.vibration) haptics?.reject();
       if (settings.sound) sound?.reject();
+      // A new Grow-mode player may not realise their next move is restricted.
+      board.pingCells(growHintCells());
       return false;
     }
 
+    rememberOpeningCell(before, ref);
+    clearExplodedHints(result.events);
     state = result.state;
     hasSave = true;
     hud.render(state);
     updateHome();
     if (settings.vibration) haptics?.tap();
-    playMoveSound(
-      state.gameOver,
-      result.events.some((event) => event.type === "explode"),
-    );
+    playPlacementSound("human");
+    if (state.gameOver) playWinSound();
     storage.save(state);
 
-    animateCascade(before, result.events, () => {
-      if (screen !== "game") return;
-      if (state.gameOver) showResult();
-      else scheduleBotMove();
-    });
+    animateCascade(
+      before,
+      result.events,
+      () => {
+        if (screen !== "game") return;
+        if (state.gameOver) showResult();
+        else scheduleBotMove();
+      },
+      playExplosionSound,
+    );
     return true;
   }
 
@@ -483,6 +589,7 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
     cancelReplay(false);
     clearBotTimer();
     overlay.close();
+    hintCells.clear();
     state = createGame(
       settings.gridRows,
       settings.gridCols,
@@ -617,7 +724,8 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
   }
 
   shell.resumeButton.addEventListener("click", resumeMatch);
-  shell.newGameButton.addEventListener("click", startNewMatch);
+  // An ongoing match must be confirmed before its save is discarded.
+  shell.newGameButton.addEventListener("click", requestNewGame);
 
   shell.settingsButton.addEventListener("click", openSettings);
 
@@ -756,6 +864,35 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
     saveSettings();
   });
 
+  shell.settingsRefs.soundTap.addEventListener("change", () => {
+    settings.soundTap = shell.settingsRefs.soundTap.checked;
+    saveSettings();
+  });
+
+  shell.settingsRefs.soundBot.addEventListener("change", () => {
+    settings.soundBot = shell.settingsRefs.soundBot.checked;
+    saveSettings();
+  });
+
+  shell.settingsRefs.soundExplosion.addEventListener("change", () => {
+    settings.soundExplosion = shell.settingsRefs.soundExplosion.checked;
+    saveSettings();
+  });
+
+  for (const button of shell.settingsRefs.explosionStyleButtons) {
+    button.addEventListener("click", () => {
+      const value = button.dataset.explosionStyle;
+      if (!isExplosionStyle(value)) return;
+      settings.explosionStyle = value;
+      sound?.setExplosionStyle(value);
+      saveSettings();
+      populateSettings();
+      previewExplosion();
+    });
+  }
+
+  shell.settingsRefs.previewExplosion.addEventListener("click", previewExplosion);
+
   shell.settingsRefs.vibration.addEventListener("change", () => {
     settings.vibration = shell.settingsRefs.vibration.checked;
     saveSettings();
@@ -763,6 +900,7 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
 
   shell.settingsRefs.reset.addEventListener("click", () => {
     settings = defaultSettings();
+    sound?.setExplosionStyle(settings.explosionStyle);
     state = { ...state, growOnly: settings.growOnly };
     if (hasSave) storage.save(state);
     applyTheme();

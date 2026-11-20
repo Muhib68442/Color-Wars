@@ -4,9 +4,13 @@ This document is the contract for turning Color Wars into a stable Android app.
 It covers what "any Android" realistically means, how the APK is built, how every
 game feature maps to the Android shell, and the tests that gate a release.
 
-> **Status:** built. The engine, UI, settings, and save/resume are complete.
-> The Capacitor shell, app icon, versioning, and back-button controller are in
-> place, and the `1.0.2` debug APK has been produced.
+> **Status:** built and device-tested. The engine, UI, settings, save/resume,
+> Grow mode, and the audio/transition UX are complete. The Capacitor shell, app
+> icon, versioning, back-button controller, splash screen, and native wake lock
+> are in place. Both the `1.0.2` debug APK and a signed release APK have been
+> produced; the release APK was installed and played on a device. Those artifacts
+> predate the latest UX pass, so run `npm run android:sync` and a release build
+> again before publishing. Deployment is still pending.
 >
 > For the exact Windows commands and the future release checklist, use
 > [`RELEASE.md`](RELEASE.md).
@@ -27,7 +31,7 @@ What this means in practice:
   Android lifecycle. It is a normal APK/AAB, not a browser shortcut or a
   Trusted Web Activity.
 - The WebView renders the UI; native plugins handle storage, back button,
-  haptics, splash, and system bars.
+  haptics, splash, wake lock, and system bars.
 - The app has **no native `.so` libraries**, so one universal APK works on
   `arm64-v8a`, `armeabi-v7a`, and `x86_64` devices and emulators.
 
@@ -124,6 +128,15 @@ const config: CapacitorConfig = {
     backgroundColor: "#0f1115",
     allowMixedContent: false,
   },
+  plugins: {
+    SplashScreen: {
+      launchAutoHide: false,
+      launchFadeOutDuration: 500,
+      backgroundColor: "#0f1115",
+      androidSplashResourceName: "splash",
+      showSpinner: false,
+    },
+  },
 };
 
 export default config;
@@ -133,7 +146,10 @@ export default config;
 content. The package ID must be unique and must never change after publishing.
 The native background is dark so a dark-theme launch does not flash; the inline
 theme script in `index.html` sets the page palette before first paint, and the
-app repaints to light immediately when the saved theme is light.
+app repaints to light immediately when the saved theme is light. The splash is
+hidden from `src/main.ts` after the first screen is ready, with a 350 ms fade as
+a fallback if native hide fails. The native `KeepAwake` plugin is registered in
+`MainActivity.java`; `@capacitor/keep-awake` does not exist for Capacitor 8.
 
 ### 4.2 `vite.config.ts`
 
@@ -162,16 +178,21 @@ worker: the assets are already local, and a stale SW cache is a common cause of
 
 ```html
 <meta name="viewport"
-      content="width=device-width, initial-scale=1, viewport-fit=cover" />
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <meta name="theme-color" content="#333333" />
 <meta name="color-scheme" content="light dark" />
 ```
 
-`viewport-fit=cover` is required for edge-to-edge Android 15/16. Do **not** add
-`user-scalable=no`; it breaks accessibility. Use `touch-action: manipulation` on
-the board instead. A small inline script reads `color-wars:settings` and sets
-`data-theme="dark"` plus `theme-color` before first paint when that theme is
-saved; the app keeps both values in sync at runtime.
+`viewport-fit=cover` is required for edge-to-edge Android 15/16. Pinch-zoom is
+deliberately disabled for this fixed board game: `maximum-scale=1`,
+`user-scalable=no`, `touch-action: pan-y` on `html`/`body`, and `gesturestart` /
+`gesturechange` / `gestureend` blocking in `src/main.ts`. Normal one-finger
+scrolling and Android font/display scaling still work; the trade-off is that
+users cannot magnify the UI with a two-finger gesture, so text must remain
+legible at the supported display settings. A small inline script reads
+`color-wars:settings` and sets `data-theme="dark"` plus `theme-color` before
+first paint when that theme is saved; the app keeps both values in sync at
+runtime.
 
 ### 4.4 Android SDK versions — `android/variables.gradle`
 
@@ -243,25 +264,27 @@ v1.0.
 | ------------------------------------------------------------- | ----------------------------------------- | ---------------------------------------------- |
 | 7–15 rows × 7–15 columns rectangular board, local 1–4 players | Pure engine + DOM grid                    | Engine tests; tap on device                    |
 | Place on empty / own cell                                     | `applyMove` legality                      | Unit tests; UI test                            |
-| Grow from your cells (default on, applies mid-match)          | `state.growOnly` + `isLegalMove`          | Unit + UI test; device turn check              |
+| Grow from your cells (default on, applies mid-match, illegal-tap ping) | `state.growOnly`, `isLegalMove`, `pingCells` | Unit + UI test; device turn check          |
 | Corner 2 / edge 3 / interior 4                                | `capacityAt`                              | Unit tests                                     |
-| Cascades and ownership conversion                             | `resolveCascades` events                  | Unit tests; animation replay                   |
+| Cascades and ownership conversion                             | `resolveCascades` events                  | Unit tests; paced animation + per-pop audio    |
 | Turn indicator                                                | Visible HUD (not hidden)                  | Visual check                                   |
 | Multi-player elimination                                      | `alivePlayers` + `nextPlayer`             | Unit + UI test                                 |
 | Solo practice board                                           | `playerCount === 1` never ends            | Unit + UI test                                 |
 | Bot opponent (Easy/Medium/Hard, fixed name)                   | `engine/bot.ts` + `state.botPlayer`        | Unit + UI test; device turn timing             |
 | Win detection + overlay                                       | `evaluateWinner` + modal                  | Automated + manual                             |
-| Restart                                                       | New `createGame()`                        | Manual                                         |
+| Restart (confirmed during a live match)                       | New `createGame()` + overlay confirmation | Unit + UI test; manual                         |
 | Input lock after win                                          | `gameOver` guard                          | Unit + UI test                                 |
 | Save / resume                                                 | Preferences on pause and after each move  | Process-death test                             |
-| Settings (theme, grow mode, grid, players, bot, difficulty, names, colours, feedback) | `platform/settings.ts`, stored separately | Reload/process-death test; both themes checked |
+| Settings (theme, grow mode, grid, players, bot, difficulty, names, colours, four sound switches, vibration) | `platform/settings.ts`, stored separately | Reload/process-death test; both themes checked |
 | Android back button                                           | `@capacitor/app` listener                 | Hardware/gesture test                          |
 | Rotation / split screen                                       | Responsive CSS + safe areas               | Matrix test                                    |
 | Offline launch                                                | Bundled assets                            | Airplane-mode test                             |
-| Sound (optional)                                              | Web Audio cues, gated by setting          | Mute/background test                           |
-| Haptics (optional)                                            | `@capacitor/haptics`, gated by setting    | Device test                                    |
+| Sound (optional)                                              | Web Audio cues, master + per-cue switches | Mute/background test                           |
+| Screen awake only in a match                                  | Native `KeepAwake` plugin                 | Screen-timeout test on device                  |
+| Haptics (optional)                                            | `navigator.vibrate`, gated by setting     | Device test                                    |
 | Accessibility                                                 | Semantic buttons, labels, live regions    | TalkBack test                                  |
-| App icon / splash                                             | Adaptive icon + splash                    | Launcher check                                 |
+| App icon / splash                                             | Adaptive icon + splash, hidden after boot | Launcher + cold-start check                    |
+| Pinch-zoom disabled / UI transitions                           | Viewport + gesture guard; CSS animations  | Gesture and visual check                       |
 | Signed release                                                | Gradle signing config                     | `apksigner verify`                             |
 
 Not in v1.0: online multiplayer, accounts, ads, analytics, in-app purchases,
@@ -294,11 +317,15 @@ server; it does not change the packaging model.
   placement rule). Version-2 saves are migrated on load with `botPlayer: null`;
   versions 2 and 3 are migrated with `growOnly: true`.
 - Settings are stored separately under `color-wars:settings` as
-  `{ version: 5, settings: GameSettings }` (`theme`, `growOnly`, `gridRows`,
-  `gridCols`, `bot`). Settings v1/v2 are migrated on load; a missing or invalid
-  theme becomes `light`, a missing `bot` flag becomes `false`, and a missing
-  `growOnly` flag becomes `true`. The Grow switch updates the live match as well
-  as future games.
+  `{ version: 7, settings: GameSettings }` (`theme`, `difficulty`, `growOnly`,
+  `gridRows`, `gridCols`, `bot`, `profiles`, `sound`, `soundTap`, `soundBot`,
+  `soundExplosion`, `explosionStyle`, `vibration`). First-run defaults are Bot
+  on, Easy, Grow on, all sounds on, and Pop explosions. Settings v1–v6 are
+  normalized on load; a missing or invalid theme becomes `light`, a missing
+  `bot` flag follows the default (on), an invalid `bot` flag becomes `false`,
+  and missing `growOnly`/sound sub-switches become `true`. An unknown
+  `explosionStyle` falls back to Pop. The Grow switch updates the live match as
+  well as future games.
 - On launch: validate the schema, check the row/column range, player count, Bot
   seat, owner range, and stability. If anything is invalid — including a
   version-1 save — start a new game instead of restoring a corrupt state.
@@ -342,10 +369,10 @@ Test the gesture navigation and predictive back on Android 13+.
 
   Cells are square (`aspect-ratio: 1`), so the board fills the stage: a tall
   11×7 board uses the full height and a wide 7×11 board uses the full width.
-- Touch targets must stay at least **48 dp**; scale cells with the board. At
-  15×15 on a narrow phone, cells fall below 48 dp, so add a zoom/inspect
-  affordance or accept the smaller visual target with a larger hit area before
-  release.
+- Touch targets should stay near **48 dp**; scale cells with the board. At
+  15×15 on a narrow phone, cells fall below that size. Pinch-zoom is disabled,
+  so accept the smaller visual target (cells remain real buttons with a full
+  square hit area) and verify accuracy on the device matrix.
 - In four-player mode, keep the P3/P4 side rails readable in portrait; they are
   one card thickness wide (`--score-thickness`, 32–40 px) so the board keeps as
   much width as possible.
@@ -368,17 +395,33 @@ Test the gesture navigation and predictive back on Android 13+.
 
 ### 6.6 Sound and haptics
 
-- The web build already emits short Web Audio cues for place, explosion, win,
-  and reject, and uses `navigator.vibrate` for haptics.
+- The WebView emits short Web Audio cues for the human tap (`place`), Bot tap
+  (`botPlace`), each detonation (`explode`), win, and rejection, plus
+  `navigator.vibrate` haptics.
+- The Bot cue is a lower two-note pip; the explosion cue fires from the
+  animation's `onExplode` callback as each cascade group starts. With reduced
+  motion, up to four explosion cues still fire from the final event stream.
+- Settings offers four synthesized styles — Pop (default), Boom, Crackle, and
+  Fizz — selected with `Sound.setExplosionStyle()`. **Try** previews the current
+  style and is gated only by the master Sound switch.
 - Audio unlocks on the first user gesture (Android autoplay policy); a rejected
   move before any gesture is silent rather than a crash.
 - Pause/mute audio on `pause` and when the app loses focus.
-- The **Sound** and **Vibration** toggles in Settings are persisted under
-  `color-wars:settings` and gate every call.
-- Replace haptics with `@capacitor/haptics` behind the existing `Haptics`
-  interface; it must no-op gracefully on web.
+- The **Sound**, **Your taps**, **Bot taps**, **Explosions**, and **Vibration**
+  toggles are persisted under `color-wars:settings` and gate every call.
+- Replace haptics with a native adapter behind the existing `Haptics` interface;
+  it must no-op gracefully on web.
 - If WebView audio misbehaves in the background, swap in a native audio plugin
   behind the existing `Sound` interface without touching the controller.
+
+### 6.6.1 Wake lock
+
+- `src/platform/wakeLock.ts` calls the native `KeepAwake` plugin only when the
+  match screen is open; `showScreen()` releases it on Home, Settings, How to
+  play, and About.
+- `KeepAwakePlugin.java` uses `WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON`
+  and clears the flag in `allowSleep()` / `handleOnDestroy()`. Web builds use a
+  no-op path.
 
 ### 6.7 Error handling
 
@@ -394,7 +437,8 @@ Test the gesture navigation and predictive back on Android 13+.
 
 - 49–225 DOM nodes; animate with CSS transforms/opacity, not layout properties.
 - Replay cascade events with `requestAnimationFrame`, capped so a long chain
-  cannot freeze the UI.
+  cannot freeze the UI. Each detonation has a 450 ms minimum hold; compression
+  for long chains has a 0.65× floor and a ~30 s budget.
 - Target: first interactive frame under 1 s on a mid-range device, 60 fps
   animations, no busy loops (unlike `legacy/main.py`, which had no clock).
 - Keep the JS bundle under ~150 KB gzip. No framework, no game engine.
@@ -592,8 +636,9 @@ available, an **armeabi-v7a** device.
 
 ### 10.2 Scenarios
 
-- [ ] Clean install, first launch in airplane mode.
-- [ ] Cold start, warm start, resume after hours.
+- [ ] Clean install, first launch in airplane mode; confirm the Bot is on at
+  Easy and Grow is on by default.
+- [ ] Cold start, warm start, resume after hours; splash fades without a flash.
 - [ ] Play a full game to a win; restart; play again.
 - [ ] Play 1-, 2-, 3-, and 4-player matches; confirm rails and turn order.
 - [ ] Turn on the Bot, confirm `Bot` cannot be renamed, and play a full match on
@@ -605,7 +650,16 @@ available, an **armeabi-v7a** device.
   themes.
 - [ ] Switch Light/Dark, visit every screen and a live match, restart the app,
   and confirm the theme is restored without a light flash.
-- [ ] Toggle sound and vibration off; confirm both stay off after relaunch.
+- [ ] Toggle master Sound, Your taps, Bot taps, Explosions, and Vibration off;
+      confirm each stays off after relaunch and the others still work.
+- [ ] In Settings, try Pop, Boom, Crackle, and Fizz; confirm **Try** previews the
+      selected style and the choice persists after relaunch.
+- [ ] Tap an illegal cell after the first orb in Grow mode; confirm the owned
+      cell pulses. Press **New game** from Home mid-match; confirm cancel and
+      restart both work.
+- [ ] Confirm the screen stays awake in a match and sleeps on menus.
+- [ ] Try pinch-zoom on the board and menus; confirm it does nothing while
+      one-finger scrolling still works.
 - [ ] Force-stop mid-game; relaunch; state restored.
 - [ ] Upgrade from a version-1 save; confirm it is dropped, not half-loaded.
 - [ ] Upgrade from a version-2 save; confirm it resumes with no Bot seat.

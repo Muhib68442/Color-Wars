@@ -264,11 +264,12 @@ color-wars/
 │   │   ├── animations.ts        # consumes engine events
 │   │   └── query.ts             # required-element helper
 │   ├── platform/
-│   │   ├── storage.ts           # save schema v3, localStorage adapter
+│   │   ├── storage.ts           # save schema v4, localStorage adapter
 │   │   ├── settings.ts          # settings model, colour helpers, persistence
 │   │   ├── sound.ts             # Web Audio cues + no-op fallback
-│   │   ├── backButton.ts        # Android back handling (Phase 3)
-│   │   └── haptics.ts           # navigator.vibrate; Capacitor in Phase 3
+│   │   ├── wakeLock.ts          # native KeepAwake plugin / web no-op
+│   │   ├── backButton.ts        # Android back handling
+│   │   └── haptics.ts           # navigator.vibrate; native adapter optional
 │   └── styles/
 │       ├── tokens.css
 │       └── app.css
@@ -333,9 +334,19 @@ type GameEvent =
   labels, and palette tokens; apply the light/dark theme to `<html>` and
   regenerate the palette for that theme; grid rows/columns and player count take
   effect on the next **New game**.
+- Confirm before **New game** discards a live match. In Grow mode, pin one
+  in-session teaching hint to the cell each player first placed: an illegal tap
+  pings that cell until it detonates, then the hint retires for good instead of
+  jumping to another owned cell.
 - Detect the Bot seat from `state.botPlayer`, always render it as `Bot`, and
   auto-play its turn through `chooseBotMove` + `applyMove` while locking board
   input. The name field for that seat is disabled.
+- Route sound cues through the `Sound` interface with master and per-cue
+  switches; replay explosion sounds from the animation's per-group callback.
+  Settings exposes a Pop/Boom/Crackle/Fizz picker and a master-gated **Try**
+  preview that calls `explode()` directly.
+  Hold a wake lock only while the match screen is open, and keep pinch-zoom
+  disabled in the shell.
 - Contain **no rule logic** (no capacity checks, no winner checks).
 
 #### Platform contract
@@ -344,10 +355,11 @@ type GameEvent =
 | --- | --- | --- |
 | Storage | `localStorage` | `@capacitor/preferences` |
 | Settings | `localStorage` under `color-wars:settings` | `@capacitor/preferences` |
-| Sound | Web Audio API (`createSound`) | Web Audio in the WebView; native audio if needed |
+| Sound | Web Audio API (`createSound`) with switchable explosion styles | Web Audio in the WebView; native audio if needed |
 | Back button | no-op | `@capacitor/app` `backButton` listener |
-| Haptics | `navigator.vibrate` / no-op | `@capacitor/haptics` |
-| Splash / status bar | n/a | `@capacitor/splash-screen`, status-bar APIs |
+| Haptics | `navigator.vibrate` / no-op | native adapter optional behind `Haptics` |
+| Wake lock | no-op | native `KeepAwake` plugin (`WindowManager` flag) |
+| Splash / status bar | no-op | `@capacitor/splash-screen`, hidden after boot |
 | Lifecycle | `visibilitychange` | `appStateChange` + `pause` |
 
 Both storage and settings go through the same `KeyValueStore` interface, so the
@@ -376,8 +388,8 @@ so the same build runs in a desktop browser and inside the APK.
 | 2 | rewrite the UI against the engine: visible turn banner, win overlay, restart, save/resume, accessibility | **done** |
 | 2.5 | home menu, settings, 1–4 players, 7–15 rows/columns, names/colours, sound and vibration toggles | **done** |
 | 2.6 | Bot opponent with Easy/Medium/Hard difficulty, stacking/attack heuristic, 2-ply Hard search, fixed `Bot` name, save-resumable AI seat | **done** |
-| 3 | Capacitor shell, Android project, Preferences persistence hardening, device testing | next |
-| 4 | signing, release build, Play checklist, hardening | planned |
+| 3 | Capacitor shell, Android project, Preferences persistence hardening, device testing | **done** |
+| 4 | signing, release build, Play checklist, hardening | done locally; deployment pending |
 
 The root `index.html`, `src/ui/`, `src/platform/`, and `src/styles/` are the new
 UI. The legacy `style.css` / `script.js` were removed once the engine-backed UI
@@ -387,18 +399,24 @@ replaced them.
 
 ```
 Save     = { version: 4, savedAt: number, state: GameState }
-Settings = { version: 5, settings: GameSettings }
+Settings = { version: 7, settings: GameSettings }
 ```
 
 `GameSettings` stores `theme` (`light` or `dark`), `gridRows` and `gridCols`
 separately (each 7–15), a `bot` flag that gives the highest-numbered seat to the
-AI, and a `growOnly` flag (on by default) that restricts later moves to cells
-the player already owns. Version-1 settings that used a single square `gridSize`
-are normalized onto both axes on load; settings without a valid theme (v1/v2)
-default to light; settings without `bot` (v1–v3) default it to off; settings
-without `growOnly` default it to on. The theme is applied to
-`<html data-theme="…">`, and a small inline script in `index.html` reads the
-saved value before first paint.
+AI, a `growOnly` flag (on by default) that restricts later moves to cells the
+player already owns, and four feedback switches: `sound`, `soundTap`,
+`soundBot`, `soundExplosion`, plus `vibration`. `explosionStyle` selects one of
+four synthesised detonation cues (Pop, Boom, Crackle, Fizz). First-run defaults
+are Bot on, Easy difficulty, Grow on, 7×7, two players, all feedback on, and Pop
+explosions. Version-1
+settings that used a single square `gridSize` are normalized onto both axes on
+load; settings without a valid theme (v1/v2) default to light; a missing `bot`
+flag follows the current default (on) while an invalid one is treated as off;
+settings without `growOnly` or the sound sub-switches default them to on, and an
+unknown `explosionStyle` falls back to Pop. The theme is applied to
+`<html data-theme="…">`, and a small inline script in
+`index.html` reads the saved value before first paint.
 
 `SAVE_VERSION = 4` adds `GameState.growOnly` to the multi-player, variable-grid
 state shape. `parseSave` accepts versions 2 and 3: version 2 is migrated with
@@ -407,9 +425,9 @@ migrated with `growOnly: true`, so existing saves resume under the new default
 rule. The app also copies the current settings value onto a resumed state, and
 the Settings switch updates an in-progress match immediately without rewriting
 the board. Version-1 saves are rejected by `parseSave` and removed from the
-store, so an older save can never half-load into the new renderer. Phase 3
-migrates the same payloads to `@capacitor/preferences`; a migration hook can map
-v1 → v2 → v3 → v4 there if resuming old games becomes a requirement.
+store, so an older save can never half-load into the new renderer. The same
+payloads are used through the `KeyValueStore` adapter on Android; save v2–v3 and
+settings v1–v5 are normalized on load into the current schemas.
 
 ### 4.5 Android packaging
 
@@ -435,7 +453,9 @@ Studio 2025.2.1+, fully offline assets, no runtime permissions required.
 - **Grow mode:** done — `isLegalMove` reads `state.growOnly`, copied from the
   Settings switch. After a player's first orb it permits only cells that player
   already owns, with a free placement when they have been wiped off the board.
-  The switch applies to the current match immediately.
+  The switch applies to the current match immediately. An illegal tap pings the
+  player's opening cell only until that cell explodes; afterwards the hint is
+  retired and no ping is shown.
 - **Undo:** snapshot the state before each move.
 - **Network play:** serialise `applyMove` inputs or event streams.
 - **Persistence:** store the board as a compact string (`0`–`4` plus orb
@@ -451,7 +471,7 @@ Studio 2025.2.1+, fully offline assets, no runtime permissions required.
 ## 6. Testing strategy
 
 The engine is tested with **Vitest** (`npm test`), independently of the DOM and
-of Capacitor. The suite currently has **139 tests across 12 files**.
+of Capacitor. The suite currently has **149 tests across 12 files**.
 
 1. **Board and capacity** (`tests/engine/board.test.ts`)
    - corners 2, edges 3, interior 4;
@@ -499,16 +519,21 @@ of Capacitor. The suite currently has **139 tests across 12 files**.
    - save round-trip, corrupt-save rejection, v1 rejection, v2 → v4 migration,
      v3 → v4 grow-mode migration, explicit grow-mode preservation, four-player
      15×15 round-trip, Bot-seat validation, unstable-board refusal;
-   - settings defaults (Grow on), clamping, Bot normalisation, theme validation
-     and migration, name/colour sanitisation, colour blending, persistence, and
-     corrupt-data fallback.
+   - settings defaults (Bot on, Easy, Grow on, all sounds on), clamping, Bot
+     and sound-switch normalisation, theme validation and migration,
+     name/colour sanitisation, colour blending, persistence, and corrupt-data
+     fallback.
 8. **UI tests** (`tests/ui/app.test.ts`, jsdom)
    - the home screen gates the match and all five actions exist;
-   - **New game** clears the save, **Resume** restores an unfinished match;
+   - **New game** clears the save after confirmation when a match is ongoing;
+     **Resume** restores an unfinished match;
    - settings change theme/grow mode/grid/player count/Bot/difficulty/names/
      colours/sound/vibration and persist across a reload; Grow defaults to on
      and applies to an in-progress match immediately; the theme applies to the
-     document root;
+     document root; a fresh install starts with Bot on and Easy;
+   - per-sound switches, distinct Bot placement audio, one explosion cue per
+     detonation, the explosion-style picker/preview, and the Grow-mode
+     illegal-tap ping are covered;
    - the Bot seat is named `Bot`, cannot be renamed, auto-plays after the human
      move, and resumes from a saved Bot turn;
    - four-player layout order (`3`, `2`, `board`, `1`, `4`) and hidden rails;

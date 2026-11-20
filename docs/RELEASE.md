@@ -4,12 +4,17 @@ This is the practical, machine-specific runbook for building Color Wars as an
 Android APK. The design contract, supported versions, and device matrix live in
 [`ANDROID.md`](ANDROID.md); this file is the copy-paste checklist.
 
-> **Status:** built. The Android project, icons, splash screens, versioning, and
-> back-button adapter are in place. The debug APK for `1.0.2` was produced and
-> verified (package `com.muhib.colorwars`, version code `10002`).
-> Follow §4 for routine rebuilds and §6 for the next release.
+> **Status:** built and device-tested. The Android project, icons, splash
+> screen, versioning, back-button adapter, native wake lock, and release signing
+> are in place. The `1.0.2` debug APK and a signed release APK were produced
+> (package `com.muhib.colorwars`, version code `10002`); the release APK was
+> installed and played on a device. That APK predates the latest UX pass, so
+> rerun §5.3 before distributing. The app has not been published, so the version
+> stays at `1.0.2`. Follow §4 for routine rebuilds and §6 for the next release.
 >
-> Built artifact: `android/app/build/outputs/apk/debug/app-debug.apk`
+> Built artifacts:
+> `android/app/build/outputs/apk/debug/app-debug.apk` and
+> `android/app/build/outputs/apk/release/app-release.apk`.
 
 ---
 
@@ -26,6 +31,9 @@ Android APK. The design contract, supported versions, and device matrix live in
 | Debug APK | `android/app/build/outputs/apk/debug/app-debug.apk` | `npm run android:debug` |
 | Release APK | `android/app/build/outputs/apk/release/app-release.apk` | `gradlew.bat assembleRelease` |
 | Release AAB | `android/app/build/outputs/bundle/release/app-release.aab` | `gradlew.bat bundleRelease` |
+| Splash | `@capacitor/splash-screen` 8.0.2 | `capacitor.config.ts` + `src/main.ts` |
+| Wake lock | Native `KeepAwake` plugin | `android/app/src/main/java/com/muhib/colorwars/KeepAwakePlugin.java` |
+| Release signing | Local keystore + alias `colorwars` | gitignored `android/keystore.properties` |
 
 The About screen reads the same `package.json` version through Vite, so the web
 and Android version strings can never disagree. Its "Last updated" line uses the
@@ -228,8 +236,10 @@ No emulator or physical device is required to produce the APK.
 
 ## 5. Release signing (for Play Store or a shareable APK)
 
-This step is **not** needed for the debug build. Do it once and keep the files
-safe.
+This step is **not** needed for the debug build. It is already configured
+locally with `colorwars-release.keystore`, alias `colorwars`, and a gitignored
+`android/keystore.properties`. The instructions below are for a fresh machine or
+for replacing the upload key. Keep the files safe.
 
 ### 5.1 Create the keystore
 
@@ -290,6 +300,8 @@ buildTypes {
 ### 5.3 Build and verify
 
 ```powershell
+# From the repository root, with the JDK/SDK variables from §2 set:
+npm run android:sync
 cd android
 .\gradlew.bat assembleRelease
 .\gradlew.bat bundleRelease
@@ -329,6 +341,13 @@ Only these values normally change:
    `assets/logo-dark.svg`, then run `npm run android:assets`.
 4. **Code / UI** — normal web development; always run `npm test` and `npm run
    android:debug` so the bundled assets are refreshed.
+5. **Native shell** — changes to `MainActivity.java`, `KeepAwakePlugin.java`,
+   Capacitor plugins, or `capacitor.config.ts` need `npm run android:sync` and a
+   full Gradle rebuild, then re-signing with the same upload key.
+
+In short: **you** control the package ID (`appId`/`applicationId`), the user
+version and derived version code, the icon/splash assets, and the signing key.
+Everything else follows from those four inputs.
 
 Never change:
 
@@ -361,6 +380,10 @@ Release checklist:
 - Gradle 8.14.3 and the build cache live in `F:\gradle-home`.
 - Android Studio 2022.3 with JDK 17 is installed at
   `F:\Software Program Data\Android Studio`; it is **not** used by this runbook.
-- The `android/` project exists and `npm run android:debug` produces the debug
-  APK. The same environment variables as §2 are needed in each new shell:
-  `JAVA_HOME`, `ANDROID_HOME`, `ANDROID_SDK_ROOT`, `GRADLE_USER_HOME`, `Path`.
+- The `android/` project exists; `npm run android:debug` produces the debug APK
+  and `gradlew.bat assembleRelease` produces the signed release APK. The same
+  environment variables as §2 are needed in each new shell: `JAVA_HOME`,
+  `ANDROID_HOME`, `ANDROID_SDK_ROOT`, `GRADLE_USER_HOME`, `Path`.
+- `@capacitor/splash-screen` 8.0.2 is installed. `@capacitor/keep-awake` does not
+  exist for Capacitor 8, so screen-awake behaviour uses the local native plugin
+  registered in `MainActivity`.

@@ -14,16 +14,20 @@ import {
 import { memoryStore } from "../../src/platform/storage.js";
 
 describe("settings defaults", () => {
-  it("starts light at medium, 7x7, two players, sound and vibration on", () => {
+  it("starts light on Easy with a Bot, 7x7, two players, and all sounds on", () => {
     const settings = defaultSettings();
 
-    expect(settings.difficulty).toBe("medium");
+    expect(settings.difficulty).toBe("easy");
     expect(settings.theme).toBe("light");
     expect(settings.gridRows).toBe(7);
     expect(settings.gridCols).toBe(7);
     expect(settings.playerCount).toBe(2);
-    expect(settings.bot).toBe(false);
+    expect(settings.bot).toBe(true);
     expect(settings.sound).toBe(true);
+    expect(settings.soundTap).toBe(true);
+    expect(settings.soundBot).toBe(true);
+    expect(settings.soundExplosion).toBe(true);
+    expect(settings.explosionStyle).toBe("pop");
     expect(settings.vibration).toBe(true);
     expect(settings.profiles[1].name).toBe("Player 1");
     expect(settings.profiles[1].color).toMatch(/^#[0-9a-f]{6}$/i);
@@ -76,7 +80,7 @@ describe("normalizeSettings", () => {
       vibration: false,
     });
 
-    expect(settings.difficulty).toBe("medium");
+    expect(settings.difficulty).toBe("easy");
     expect(settings.profiles[1]).toEqual({
       name: "Ada",
       color: defaultSettings().profiles[1].color,
@@ -101,6 +105,30 @@ describe("normalizeSettings", () => {
     expect(normalizeSettings({ bot: true, playerCount: 4 }).bot).toBe(true);
     expect(normalizeSettings({ bot: "yes", playerCount: 2 }).bot).toBe(false);
     expect(normalizeSettings({ bot: true, playerCount: 1 }).bot).toBe(false);
+    // A missing flag is a fresh install, which starts against an Easy Bot.
+    expect(normalizeSettings({}).bot).toBe(true);
+    expect(normalizeSettings({}).difficulty).toBe("easy");
+  });
+
+  it("normalizes the individual sound switches and explosion style", () => {
+    const settings = normalizeSettings({
+      sound: false,
+      soundTap: false,
+      soundBot: "yes",
+      soundExplosion: false,
+      explosionStyle: "fizz",
+      vibration: false,
+    });
+
+    expect(settings.sound).toBe(false);
+    expect(settings.soundTap).toBe(false);
+    expect(settings.soundBot).toBe(true);
+    expect(settings.soundExplosion).toBe(false);
+    expect(settings.explosionStyle).toBe("fizz");
+    expect(normalizeSettings({ explosionStyle: "loud" }).explosionStyle).toBe(
+      "pop",
+    );
+    expect(settings.vibration).toBe(false);
   });
 });
 

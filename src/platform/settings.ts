@@ -11,11 +11,13 @@ import {
 import { isRecord, type KeyValueStore } from "./storage.js";
 
 export const SETTINGS_KEY = "color-wars:settings";
-export const SETTINGS_VERSION = 5;
+export const SETTINGS_VERSION = 7;
 export const MAX_NAME_LENGTH = 16;
 
 export type { Difficulty };
 export type Theme = "light" | "dark";
+/** Synthesised cascade sounds available in Settings. */
+export type ExplosionStyle = "pop" | "boom" | "crackle" | "fizz";
 
 export interface PlayerProfile {
   name: string;
@@ -33,7 +35,16 @@ export interface GameSettings {
   /** Play only on owned cells after the first move; applies immediately. */
   growOnly: boolean;
   profiles: Record<Player, PlayerProfile>;
+  /** Master switch for all game sounds. */
   sound: boolean;
+  /** Sound for the human player's placement. */
+  soundTap: boolean;
+  /** Sound for the Bot's placement. */
+  soundBot: boolean;
+  /** Sound for each detonation in a cascade. */
+  soundExplosion: boolean;
+  /** Which synthesised cue to use for detonations. */
+  explosionStyle: ExplosionStyle;
   vibration: boolean;
 }
 
@@ -54,12 +65,13 @@ const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 
 export function defaultSettings(): GameSettings {
   return {
-    difficulty: "medium",
+    // A first-time player meets a gentle Bot opponent straight away.
+    difficulty: "easy",
     theme: "light",
     gridRows: MIN_GRID_SIZE,
     gridCols: MIN_GRID_SIZE,
     playerCount: 2,
-    bot: false,
+    bot: true,
     growOnly: true,
     profiles: {
       1: { ...DEFAULT_PROFILES[1] },
@@ -68,6 +80,10 @@ export function defaultSettings(): GameSettings {
       4: { ...DEFAULT_PROFILES[4] },
     },
     sound: true,
+    soundTap: true,
+    soundBot: true,
+    soundExplosion: true,
+    explosionStyle: "pop",
     vibration: true,
   };
 }
@@ -88,6 +104,15 @@ export function isDifficulty(value: unknown): value is Difficulty {
 
 export function isTheme(value: unknown): value is Theme {
   return typeof value === "string" && (THEMES as string[]).includes(value);
+}
+
+const EXPLOSION_STYLES: ExplosionStyle[] = ["pop", "boom", "crackle", "fizz"];
+
+export function isExplosionStyle(value: unknown): value is ExplosionStyle {
+  return (
+    typeof value === "string" &&
+    (EXPLOSION_STYLES as string[]).includes(value)
+  );
 }
 
 export function isHexColor(value: unknown): value is string {
@@ -129,10 +154,16 @@ export function normalizeSettings(value: unknown): GameSettings {
     defaults.playerCount,
   ) as PlayerCount;
 
-  // A solo practice board has no opponent to automate.
+  // A solo practice board has no opponent to automate. A missing flag means a
+  // fresh install (Bot on); an invalid flag falls back to safe, off.
+  const storedBot = value["bot"];
   const bot =
     playerCount > 1 &&
-    (typeof value["bot"] === "boolean" ? value["bot"] : defaults.bot);
+    (typeof storedBot === "boolean"
+      ? storedBot
+      : storedBot === undefined
+        ? defaults.bot
+        : false);
 
   // Settings v1 stored one square `gridSize`; both axes inherit it on load.
   const legacySize = clampInt(
@@ -167,6 +198,21 @@ export function normalizeSettings(value: unknown): GameSettings {
         : defaults.growOnly,
     profiles,
     sound: typeof value["sound"] === "boolean" ? value["sound"] : defaults.sound,
+    soundTap:
+      typeof value["soundTap"] === "boolean"
+        ? value["soundTap"]
+        : defaults.soundTap,
+    soundBot:
+      typeof value["soundBot"] === "boolean"
+        ? value["soundBot"]
+        : defaults.soundBot,
+    soundExplosion:
+      typeof value["soundExplosion"] === "boolean"
+        ? value["soundExplosion"]
+        : defaults.soundExplosion,
+    explosionStyle: isExplosionStyle(value["explosionStyle"])
+      ? value["explosionStyle"]
+      : defaults.explosionStyle,
     vibration:
       typeof value["vibration"] === "boolean"
         ? value["vibration"]

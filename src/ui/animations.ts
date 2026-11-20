@@ -17,6 +17,8 @@ type Tracker = (animation: Animation) => void;
 export interface ReplayCallbacks {
   /** Show a board snapshot while the cascade is still resolving. */
   render(state: GameState): void;
+  /** Called as each cell detonates, so a sound can accompany the visual. */
+  onExplode?(): void;
   /** Called once every group has been shown. */
   done(): void;
 }
@@ -47,7 +49,11 @@ const RING_MS = 440;
  * Long cascades are compressed to this budget so a pathological chain cannot
  * lock the UI for minutes. Short cascades use the full, deliberately slow pace.
  */
-const MAX_REPLAY_MS = 20_000;
+const MAX_REPLAY_MS = 30_000;
+/** A detonation is never allowed to flash past in fewer than this many ms. */
+const MIN_EXPLODE_MS = 450;
+/** Floor for the compression applied to very long cascades. */
+const MIN_TIMING_SCALE = 0.65;
 
 const active = new WeakMap<Element, Animation>();
 const takeovers = new WeakMap<Element, Animation>();
@@ -97,7 +103,10 @@ function groupDuration(group: ReplayGroup): number {
 function timingScale(groups: ReplayGroup[]): number {
   let total = 0;
   for (const group of groups) total += groupDuration(group);
-  return total > MAX_REPLAY_MS ? MAX_REPLAY_MS / total : 1;
+  const scale = total > MAX_REPLAY_MS ? MAX_REPLAY_MS / total : 1;
+  // Recursive cascades used to compress to the point where individual pops
+  // were unreadable. Keep a floor so every step stays visible.
+  return Math.max(scale, MIN_TIMING_SCALE);
 }
 
 function cellKeyframes(effect: CellEffect): Keyframe[] {
@@ -524,6 +533,7 @@ export function playEvents(
 
       applyGameEvent(work, group.lead);
       callbacks.render(work);
+      callbacks.onExplode?.();
 
       const source = view.elementFor(group.lead.at);
       if (source !== null) {
@@ -588,7 +598,9 @@ export function playEvents(
           lastStart + flight + landingDuration,
         ) + scaled(LANDING_HOLD_MS, scale);
 
-      if (!(await clock.wait(groupEnd))) return;
+      // Even a heavily compressed chain gives each detonation a readable pause.
+      const hold = Math.max(groupEnd, MIN_EXPLODE_MS);
+      if (!(await clock.wait(hold))) return;
       await Promise.all(landings);
     }
 

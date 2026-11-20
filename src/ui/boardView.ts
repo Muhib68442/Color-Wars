@@ -32,6 +32,8 @@ export interface BoardView {
   elementFor(ref: CellRef): HTMLElement | null;
   /** The configured colour for a player, used by the movement animations. */
   playerColor(player: Player): string;
+  /** Briefly pulse cells to show a player where they are allowed to play. */
+  pingCells(refs: CellRef[]): void;
   focusCell(ref: CellRef): void;
   focusDefault(): void;
 }
@@ -86,6 +88,7 @@ export function createBoardView(
   let cols = 0;
   let lastState: GameState | null = null;
   let roving: CellRef = { row: 0, col: 0 };
+  const pingTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   function build(nextRows: number, nextCols: number): void {
     rows = nextRows;
@@ -236,6 +239,34 @@ export function createBoardView(
     applyTabStops(roving, locked);
   }
 
+  /**
+   * Pulses the given cells so a rejected tap can point a new Grow-mode player
+   * back to their opening cell. The class is removed after a short hold and is
+   * safe to restart while another hint is still running.
+   */
+  function pingCells(refs: CellRef[]): void {
+    for (const ref of refs) {
+      const node = cellAt(ref.row, ref.col);
+      if (node === undefined) continue;
+
+      const key = keyOf(ref.row, ref.col);
+      const previous = pingTimers.get(key);
+      if (previous !== undefined) clearTimeout(previous);
+
+      node.button.classList.remove("cell--ping");
+      // Reading layout restarts the CSS animation when the class is re-added.
+      void node.button.offsetWidth;
+      node.button.classList.add("cell--ping");
+      pingTimers.set(
+        key,
+        setTimeout(() => {
+          node.button.classList.remove("cell--ping");
+          pingTimers.delete(key);
+        }, 700),
+      );
+    }
+  }
+
   function focusCell(ref: CellRef): void {
     const node = cellAt(ref.row, ref.col);
     if (node === undefined) return;
@@ -332,6 +363,7 @@ export function createBoardView(
     render,
     elementFor: (ref) => cellAt(ref.row, ref.col)?.button ?? null,
     playerColor: (player) => options.getProfiles()[player].color,
+    pingCells,
     focusCell,
     focusDefault,
   };

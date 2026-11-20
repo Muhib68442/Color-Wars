@@ -18,10 +18,10 @@ dialog. Only one screen is visible at a time (`hidden` attribute).
 | --- | --- | --- |
 | **Home** | Branding and the five top-level actions | Launch, Back to home |
 | **Match** | The board, one score card per active player, and turn status | **Resume**, **New game** |
-| **Settings** | Theme, grow mode, grid, player count, Bot opponent and difficulty, names, colours, sound, vibration | Home **Settings** |
+| **Settings** | Theme, grow mode, grid, player count, Bot opponent and difficulty, names, colours, individual sound switches, vibration | Home **Settings** |
 | **How to play** | Rules, controls, and tips | Home **How to play**, in-match menu |
 | **About** | Logo, name, version, last updated, website link | Home **About** |
-| **Dialog** | Result, restart confirmation, game menu | Game events, menu button |
+| **Dialog** | Result, New game / restart confirmation, game menu | Game events, menu button, **New game** |
 
 ```
                  ┌──────────────▶ Settings ──back──▶ Home
@@ -125,12 +125,14 @@ of cards:
    every screen and is saved.
 2. **Match** — a **Grow from your cells** switch (on by default, applied
    immediately), difficulty segmented control with a live `Bot · <Difficulty>`
-   badge, and grid stepper.
-3. **Players** — player-count segmented control (1–4), a **Bot opponent** switch,
-   and one row per player with a colour swatch and a name field. Rows above the
-   selected count are hidden. The Bot seat uses the label and value `Bot`, and its
-   name field is disabled.
-4. **Feedback** — Sound and Vibration switches.
+   badge, and grid stepper. A fresh install starts with Easy selected.
+3. **Players** — player-count segmented control (1–4), a **Bot opponent** switch
+   (on by default), and one row per player with a colour swatch and a name field.
+   Rows above the selected count are hidden. The Bot seat uses the label and
+   value `Bot`, and its name field is disabled.
+4. **Feedback** — master Sound switch plus **Your taps**, **Bot taps**, and
+   **Explosions** switches, a Vibration switch, and an **Explosion style** picker
+   with a **Try** preview. All switches start on; the default style is Pop.
 5. **Reset to defaults** — a quiet button below the cards.
 
 ### 2.5 How to play
@@ -228,6 +230,13 @@ body
     │       │               └── input[type="text"][data-role="player-name"]
     │       ├── section.panel                        Feedback
     │       │   ├── label.switch > input[data-setting="sound"]
+    │       │   ├── label.switch > input[data-setting="sound-tap"]
+    │       │   ├── label.switch > input[data-setting="sound-bot"]
+    │       │   ├── label.switch > input[data-setting="sound-explosion"]
+    │       │   ├── div.field                        Explosion style
+    │       │   │   ├── button[data-action="preview-explosion"]         "Try"
+    │       │   │   └── div.segmented[data-role="explosion-style"]
+    │       │   │       └── button[data-explosion-style="pop|boom|crackle|fizz"]
     │       │   └── label.switch > input[data-setting="vibration"]
     │       └── button.btn.btn--quiet[data-action="reset-settings"]
     ├── section.screen.screen--about[data-role="about"]
@@ -478,12 +487,17 @@ exceeds `state.playerCount`.
 - **Grow from your cells** switch: on by default. After a player's first orb,
   only cells owned by that player are legal; with the switch off, empty cells are
   legal again. A player wiped off the board gets one free placement. The change
-  applies to the current match and is saved immediately.
-- **Difficulty** segmented control: Easy / Medium / Hard. The badge reads
-  `Bot · <Difficulty>` and the choice is saved immediately. Easy plays a random
-  legal move, Medium greedily builds its own cells and attacks rival ones, and
-  Hard searches the opponent's strongest reply before committing. The choice
-  applies to the Bot's next turn and to every new Bot match.
+  applies to the current match and is saved immediately. If a player taps an
+  illegal square after their first move, the cell they first placed pulses as a
+  visual hint. Once that cell explodes, the hint is retired and no further pings
+  are shown, even if they own other cells. The hint lives for the current app
+  session; this only happens in Grow mode.
+- **Difficulty** segmented control: Easy / Medium / Hard, with **Easy selected
+  on a fresh install**. The badge reads `Bot · <Difficulty>` and the choice is
+  saved immediately. Easy plays a random legal move, Medium greedily builds its
+  own cells and attacks rival ones, and Hard searches the opponent's strongest
+  reply before committing. The choice applies to the Bot's next turn and to
+  every new Bot match.
 - **Grid size** has one stepper per axis: rows and columns each 7–15, step 1,
   with the minus/plus buttons disabled at the limits. The plus/minus symbols are
   drawn as centred CSS bars rather than font glyphs, so they sit exactly in the
@@ -493,24 +507,37 @@ exceeds `state.playerCount`.
 - **Number of players** segmented control: 1 / 2 / 3 / 4. Applies on the next
   **New game** and reveals the matching player rows. Choosing 1 player turns the
   Bot off, because a solo practice board has no opponent.
-- **Bot opponent** switch: when on, the highest-numbered seat is played by the
-  Bot. Small tables move to two players if needed; the hint names the seat, for
-  example `Player 2 is the Bot. It cannot be renamed.` The Bot always takes the
-  last seat in the next match; it does not alter a match already in progress.
+- **Bot opponent** switch: on by default on a fresh install. When on, the
+  highest-numbered seat is played by the Bot. Small tables move to two players
+  if needed; the hint names the seat, for example `Player 2 is the Bot. It
+  cannot be renamed.` The Bot always takes the last seat in the next match; it
+  does not alter a match already in progress.
 - **Player rows**: a native colour input and a text input capped at 16
   characters. Empty names fall back to `Player N` on blur. Names and colours
   apply immediately, including to an existing match. The Bot's label and value
   are fixed to `Bot`, and its text input is disabled.
-- **Feedback**: Sound and Vibration switches. Both gate the corresponding
-  platform calls on the next move.
-- **Reset to defaults** restores the full default settings object and saves it.
+- **Feedback**: a master **Sound** switch plus **Your taps**, **Bot taps**, and
+  **Explosions** switches, a **Vibration** switch, and an **Explosion style**
+  segmented picker with a **Try** button. The master gate controls all audio;
+  the other sound switches gate one cue each. The human tap is a bright pip, the
+  Bot tap is a lower two-note cue, and explosions fire once per detonation as a
+  cascade plays.
+  - **Pop** (default): a bright two-layer pop, closest to the original cue.
+  - **Boom**: a deep, rounded thump with a short low-frequency tail.
+  - **Crackle**: a snappy burst with three quick high sparks.
+  - **Fizz**: a softer, airy release rather than a hard pop.
+  - **Try** previews the selected cue. It is gated only by the master Sound
+    switch, so it still works while the per-move Explosions switch is off.
+- **Reset to defaults** restores the full default settings object (Bot on,
+  Easy, Grow on, all sounds on, Pop explosions) and saves it.
 
 All settings are written to `color-wars:settings` as
-`{ version: 5, settings: GameSettings }` on every change. Version-1 blobs that
+`{ version: 7, settings: GameSettings }` on every change. Version-1 blobs that
 stored a single square `gridSize` are migrated onto both axes on load;
-version-1/2 blobs without a theme default to light; version 1–3 blobs without a
-`bot` flag default it to off; and older blobs without `growOnly` default it to
-on.
+version-1/2 blobs without a theme default to light; a missing `bot` flag follows
+the current default (on) while an invalid one is treated as off; a missing
+`growOnly` flag defaults to on; missing sound sub-switches default to on; and an
+unknown `explosionStyle` falls back to Pop.
 
 ### 5.8 How to play screen
 
@@ -532,13 +559,14 @@ on.
 
 ### 5.10 Dialog (`dialog.overlay`)
 
-Used for three things:
+Used for three kinds of dialog, with the restart confirmation reachable from two places:
 
 1. **Result** — eyebrow "Game over", title `<name> wins` or `It's a draw`,
    explanation, and **Play again** (primary) / **Back to home**.
-2. **Restart confirmation** — title "Restart match?", the warning that the
-   match and save will be lost, and **No, keep playing** (primary) /
-   **Yes, restart**. Shown when Restart match is chosen during a live game.
+2. **New game / restart confirmation** — title "Restart match?", the warning
+   that the match and save will be lost, and **No, keep playing** (primary) /
+   **Yes, restart**. Shown when **New game** is pressed on Home during a live
+   match, or when Restart match is chosen in the in-match menu.
 3. **Game menu** — title "Paused", the current turn (`Bot is thinking…` when
    applicable), **Keep playing** (primary), **Restart match**, **How to play**,
    and **Back to home**.
@@ -573,7 +601,10 @@ Behaviour:
 | Explosion | Source cell is held full for a beat, then flashes and a coloured ring expands; orbs hop out one group at a time |
 | Transfer | Orb clone arcs to the target; the new orb pops in under a landing ring |
 | Capture | Target keeps the old owner colour while the orb flies, then cross-fades to the new colour when the orb lands |
-| Cascade replay | Each explosion waits for the previous group's flights and takeovers, holds the filled cell for a beat, then the next cell starts |
+| Cascade replay | Each explosion waits for the previous group's flights and takeovers, holds the filled cell for at least 450 ms, then the next cell starts |
+| Grow hint | After an illegal tap in Grow mode, the opening cell pulses until it detonates; no fallback afterwards |
+| Screen transition | Match screens fade upward; Settings/How to play/About slide in from the side |
+| Dialog transition | Backdrop fades in while the card lifts and scales into place |
 | Win | Status text + modal dialog; board locked |
 | Solo mode | One score card, status reads `Player N · solo practice`, never ends |
 | Bot turn | Status reads `Bot is thinking…`; board tab stops removed until the move lands |
@@ -594,31 +625,40 @@ model does not contain (the legacy "ghost coin" bug).
   - `ArrowUp` / `ArrowDown` / `ArrowLeft` / `ArrowRight` move focus.
   - `Home` / `End` jump to the start / end of the row.
   - `Enter` / `Space` place an orb (native button activation).
-- **Home:** **Resume** opens the saved match; **New game** discards any save
-  and starts fresh from the current settings.
+- **Home:** **Resume** opens the saved match; **New game** starts fresh from the
+  current settings, but asks for confirmation first when a live match exists so
+  an accidental tap cannot discard the save.
 - **Settings:** segmented buttons and the stepper update the saved settings
   immediately; the theme control repaints the whole app; player rows update
   names/colours live; the Bot switch and difficulty pick the next match's AI
-  seat and strength; switches gate sound and vibration.
+  seat and strength; the master Sound switch and its three sub-switches gate
+  individual cues; the Explosion style picker changes the detonation cue and
+  **Try** previews it immediately; Vibration gates haptics.
 - **Menu:** **How to play** opens the rules; **Restart match** asks for
   confirmation before clearing the board; **Back to home** keeps the save.
 - **Illegal actions** (enemy cell, out of bounds, after game over, while a
   dialog is open, outside the match screen, while the Bot is thinking, or while
   a cascade replay is playing) are ignored; the turn does not change and nothing
-  is saved.
+  is saved. In Grow mode an illegal tap also pulses the player's opening owned
+  cell so the restriction is discoverable.
 - **Haptics:** a short vibration on accepted moves and a slightly longer one on
   rejected moves where the platform supports `navigator.vibrate`; suppressed
   while the Vibration setting is off and silently skipped where unsupported.
-- **Sound:** place, explosion, win, and reject cues through the Web Audio API;
-  suppressed while the Sound setting is off.
+- **Sound:** place, Bot place, explosion, win, and reject cues through the Web
+  Audio API. The master Sound switch gates everything; **Your taps**, **Bot
+  taps**, and **Explosions** gate their respective cues independently. The Bot
+  cue is a lower two-note pip, and the explosion cue fires once for each cell
+  that detonates using the selected Pop/Boom/Crackle/Fizz style. The Settings
+  **Try** button previews the style with the master Sound switch as its only
+  gate.
 - **Animations:** the UI replays the engine's event stream from the pre-move
-  board instead of rendering the final cascade up front. `src/ui/replay.ts`
+  board instead of rendering the final cascade up front. `src/ui/animations.ts`
   groups the events into one `place`/`add` step followed by one step per
   explosion (that `explode` plus the transfers it launched).
   - Each explosion holds its source cell full for a beat, then flashes,
     empties it, and emits an expanding ring in the detonating player's colour.
-    The beat keeps the orb count that trips the blast readable, even in a
-    compressed cascade.
+    The hold is at least 450 ms, so the orb count that trips the blast stays
+    readable even when a long cascade is compressed.
   - Transfers leave the source on a slow curved hop (560 ms base) with a short
     stagger between neighbours. Each arriving orb is applied to the replay
     snapshot only when its clone lands.
@@ -632,11 +672,19 @@ model does not contain (the legacy "ghost coin" bug).
     and input, focus, and Bot scheduling stay paused until the full replay
     completes. Leaving the match, opening the menu, or starting a new game
     cancels the replay and immediately renders the already-computed final state.
-  - Long cascades are compressed into a ~20 s budget rather than locking the UI
-    for minutes; short cascades keep the deliberately slow, followable pace.
-  - All effects are skipped entirely when `prefers-reduced-motion: reduce` is set
-    or Web Animations is unavailable; the board is rendered once from the final
-    state, so animations can never leave the DOM out of sync with the model.
+  - Long cascades are compressed toward a ~30 s budget rather than locking the
+    UI for minutes, but compression has a floor (0.65×) and the minimum hold
+    above still applies; short cascades keep the deliberately slow, followable
+    pace. An explosion sound is fired when each group starts.
+  - All visual effects are skipped entirely when `prefers-reduced-motion: reduce`
+    is set or Web Animations is unavailable; the board is rendered once from the
+    final state, so animations can never leave the DOM out of sync with the
+    model. Up to four explosion sounds still play from the final event stream.
+- **Transitions and platform UX:** screens, menus, and dialogs animate in; the
+  launch splash fades out after the first screen is ready. Pinch-zoom is
+  disabled in the WebView (`touch-action: pan-y` plus gesture-event blocking).
+  A wake lock is held only while the match screen is open; menus and home let
+  the screen sleep normally.
 
 ---
 
@@ -656,6 +704,9 @@ model does not contain (the legacy "ghost coin" bug).
   the home actions out in a row.
 - `viewport-fit=cover` plus `env(safe-area-inset-*)` padding keeps the UI clear
   of notches, gesture bars, and Android 15/16 system bars.
+- The viewport sets `maximum-scale=1, user-scalable=no` and the shell uses
+  `touch-action: pan-y`; normal scrolling still works, but pinch-zoom cannot
+  break the fixed board layout.
 - Light and dark are real, user-selected themes. `color-scheme` follows the
   selected theme, and `android:forceDarkAllowed=false` in the Android shell stops
   WebView auto-dark from inverting the board on top of the dark palette.
@@ -701,15 +752,19 @@ navigable and keep the focus rings, text contrast, and non-colour orb patterns.
 - The back button will return from Settings/How to play/About, then close the
   dialog, then ask before leaving a live match, then exit. That adapter lives in
   `src/platform/backButton.ts`.
-- Preferences will replace `localStorage` behind the same `KeyValueStore`
-  interface, so the UI code does not change. Save versions 2–3 and settings
-  versions 1–4 are the payloads to migrate.
-- Haptics will use `@capacitor/haptics` behind the existing `Haptics`
-  interface.
-- Sound uses the Web Audio API today; native audio can replace it behind the
-  existing `Sound` interface if background behaviour requires it.
-- The splash screen and status-bar colours are configured in the Capacitor
-  shell, not in the UI.
+- Preferences remain behind the same `KeyValueStore` interface, so the UI code
+  does not change. Save versions 2–3 and settings versions 1–6 are the payloads
+  migrated to the current schema (save v4, settings v7).
+- Haptics use `navigator.vibrate` behind the existing `Haptics` interface; a
+  native adapter can replace it without touching the controller.
+- Sound uses the Web Audio API with the `Sound` interface (`place`, `botPlace`,
+  `explode`, `win`, `reject`); native audio can replace it if background
+  behaviour requires it.
+- The splash screen is configured with `launchAutoHide: false` and hidden by
+  `src/main.ts` after startup; status-bar colours live in the Capacitor shell.
+  A small native `KeepAwake` plugin is registered in `MainActivity` and is only
+  called while the match screen is visible. Pinch-zoom is blocked at the WebView
+  boundary.
 
 ---
 

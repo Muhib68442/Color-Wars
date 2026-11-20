@@ -31,6 +31,11 @@ export interface SettingsRefs {
   gridColsPlus: HTMLButtonElement;
   playerRows: Record<Player, PlayerRowRefs>;
   sound: HTMLInputElement;
+  soundTap: HTMLInputElement;
+  soundBot: HTMLInputElement;
+  soundExplosion: HTMLInputElement;
+  explosionStyleButtons: HTMLButtonElement[];
+  previewExplosion: HTMLButtonElement;
   vibration: HTMLInputElement;
   reset: HTMLButtonElement;
 }
@@ -395,11 +400,57 @@ const SHELL_TEMPLATE = /* html */ `
         <label class="switch">
           <span class="switch__copy">
             <span class="switch__title">Sound</span>
-            <span class="switch__hint">Place, explosion, and win cues</span>
+            <span class="switch__hint">Master switch for all game audio</span>
           </span>
           <input type="checkbox" data-setting="sound" />
           <span class="switch__track" aria-hidden="true"></span>
         </label>
+
+        <label class="switch">
+          <span class="switch__copy">
+            <span class="switch__title">Your taps</span>
+            <span class="switch__hint">Bright pip when you place an orb</span>
+          </span>
+          <input type="checkbox" data-setting="sound-tap" />
+          <span class="switch__track" aria-hidden="true"></span>
+        </label>
+
+        <label class="switch">
+          <span class="switch__copy">
+            <span class="switch__title">Bot taps</span>
+            <span class="switch__hint">Lower two-note cue for the Bot's move</span>
+          </span>
+          <input type="checkbox" data-setting="sound-bot" />
+          <span class="switch__track" aria-hidden="true"></span>
+        </label>
+
+        <label class="switch">
+          <span class="switch__copy">
+            <span class="switch__title">Explosions</span>
+            <span class="switch__hint">A cue for each cell in a cascade</span>
+          </span>
+          <input type="checkbox" data-setting="sound-explosion" />
+          <span class="switch__track" aria-hidden="true"></span>
+        </label>
+
+        <div class="field">
+          <div class="field__head">
+            <span class="field__label">Explosion style</span>
+            <button class="btn btn--quiet field__preview" type="button" data-action="preview-explosion">
+              Try
+            </button>
+          </div>
+          <div class="segmented" data-role="explosion-style" role="group" aria-label="Explosion style">
+            <button type="button" data-explosion-style="pop" aria-pressed="false">Pop</button>
+            <button type="button" data-explosion-style="boom" aria-pressed="false">Boom</button>
+            <button type="button" data-explosion-style="crackle" aria-pressed="false">Crackle</button>
+            <button type="button" data-explosion-style="fizz" aria-pressed="false">Fizz</button>
+          </div>
+          <p class="field__hint">
+            Try plays the selected cue using the master Sound switch. The choice
+            applies to every cascade.
+          </p>
+        </div>
 
         <label class="switch">
           <span class="switch__copy">
@@ -590,6 +641,25 @@ export function mountShell(root: HTMLElement): Shell {
         4: playerRowRefs(root, 4),
       },
       sound: requireElement<HTMLInputElement>(root, "[data-setting='sound']"),
+      soundTap: requireElement<HTMLInputElement>(
+        root,
+        "[data-setting='sound-tap']",
+      ),
+      soundBot: requireElement<HTMLInputElement>(
+        root,
+        "[data-setting='sound-bot']",
+      ),
+      soundExplosion: requireElement<HTMLInputElement>(
+        root,
+        "[data-setting='sound-explosion']",
+      ),
+      explosionStyleButtons: Array.from(
+        root.querySelectorAll<HTMLButtonElement>("[data-explosion-style]"),
+      ),
+      previewExplosion: requireElement<HTMLButtonElement>(
+        root,
+        "[data-action='preview-explosion']",
+      ),
       vibration: requireElement<HTMLInputElement>(
         root,
         "[data-setting='vibration']",

@@ -10,9 +10,10 @@ import { noopHaptics } from "../../src/platform/haptics.js";
 import {
   createSettingsStore,
   defaultSettings,
+  SETTINGS_KEY,
   type GameSettings,
 } from "../../src/platform/settings.js";
-import { noopSound } from "../../src/platform/sound.js";
+import { noopSound, type Sound } from "../../src/platform/sound.js";
 import {
   createStorage,
   memoryStore,
@@ -26,6 +27,7 @@ interface MountOptions {
   seed?: GameState;
   store?: KeyValueStore;
   settings?: GameSettings;
+  sound?: Sound;
 }
 
 function mount(options: MountOptions = {}) {
@@ -38,16 +40,34 @@ function mount(options: MountOptions = {}) {
   if (options.seed !== undefined) storage.save(options.seed);
 
   const settingsStore = createSettingsStore(store);
-  if (options.settings !== undefined) settingsStore.save(options.settings);
+  if (options.settings !== undefined) {
+    settingsStore.save(options.settings);
+  } else if (store.getItem(SETTINGS_KEY) === null) {
+    // Scenarios here assume a deterministic hot-seat match. New installs use
+    // Bot + Easy, which is covered by its own test below. A reload must keep
+    // the settings it already saved.
+    settingsStore.save({ ...defaultSettings(), bot: false, difficulty: "medium" });
+  }
 
   const app = createApp(root, {
     storage,
     settings: settingsStore,
     haptics: noopHaptics,
-    sound: noopSound,
+    sound: options.sound ?? noopSound,
   });
 
   return { root, app, store, storage, settingsStore };
+}
+
+function soundSpy(): Sound {
+  return {
+    place: vi.fn(),
+    botPlace: vi.fn(),
+    explode: vi.fn(),
+    setExplosionStyle: vi.fn(),
+    win: vi.fn(),
+    reject: vi.fn(),
+  };
 }
 
 function button(root: HTMLElement, action: string): HTMLButtonElement {
@@ -60,6 +80,10 @@ function button(root: HTMLElement, action: string): HTMLButtonElement {
 
 function startMatch(root: HTMLElement): void {
   button(root, "new-game").click();
+  // An ongoing save asks for confirmation before it is discarded.
+  overlayActions(root)
+    .find((candidate) => candidate.textContent === "Yes, restart")
+    ?.click();
 }
 
 function resumeMatch(root: HTMLElement): void {
@@ -221,6 +245,17 @@ function difficultyButton(
   return element;
 }
 
+function explosionStyleButton(
+  root: HTMLElement,
+  style: "pop" | "boom" | "crackle" | "fizz",
+): HTMLButtonElement {
+  const element = settingsRoot(root).querySelector<HTMLButtonElement>(
+    `[data-explosion-style='${style}']`,
+  );
+  if (element === null) throw new Error(`Missing explosion style: ${style}`);
+  return element;
+}
+
 function scoreName(root: HTMLElement, player: number): string {
   return (
     root.querySelector<HTMLElement>(
@@ -297,6 +332,40 @@ describe("home screen", () => {
     expect(app.getState().moveCount).toBe(0);
     expect(store.getItem(SAVE_KEY)).toBeNull();
     expect(status(root)).toBe("Player 1 to move");
+  });
+
+  it("confirms before discarding an ongoing match", () => {
+    const saved = applyMove(createGame(), { row: 0, col: 0 }).state;
+    const { root, app, store } = mount({ seed: saved });
+
+    button(root, "new-game").click();
+
+    expect(app.getScreen()).toBe("home");
+    expect(action(root, "No, keep playing")).toBeTruthy();
+    expect(store.getItem(SAVE_KEY)).not.toBeNull();
+
+    action(root, "No, keep playing").click();
+    expect(store.getItem(SAVE_KEY)).not.toBeNull();
+
+    button(root, "new-game").click();
+    action(root, "Yes, restart").click();
+
+    expect(app.getScreen()).toBe("game");
+    expect(store.getItem(SAVE_KEY)).toBeNull();
+  });
+
+  it("starts a fresh install against an Easy Bot", () => {
+    const { root, app } = mount({ settings: defaultSettings() });
+
+    expect(app.getSettings().bot).toBe(true);
+    expect(app.getSettings().difficulty).toBe("easy");
+    expect(saveNote(root)).toContain("Bot (Easy)");
+
+    button(root, "settings").click();
+    expect(botSwitch(root).checked).toBe(true);
+    expect(difficultyButton(root, "easy").getAttribute("aria-pressed")).toBe(
+      "true",
+    );
   });
 });
 
@@ -520,6 +589,56 @@ describe("settings", () => {
     expect(app.getSettings()).toEqual(defaultSettings());
     expect(settingsStore.load().sound).toBe(true);
     expect(settingsStore.load().vibration).toBe(true);
+  });
+
+  it("toggles tap, Bot, and explosion sounds independently", () => {
+    const { root, app, settingsStore } = mount();
+    button(root, "settings").click();
+
+    const keys = ["sound-tap", "sound-bot", "sound-explosion"] as const;
+    const fields = ["soundTap", "soundBot", "soundExplosion"] as const;
+    const switches = keys.map((key) => {
+      const input = settingsRoot(root).querySelector<HTMLInputElement>(
+        `[data-setting='${key}']`,
+      );
+      if (input === null) throw new Error(`Missing ${key} switch`);
+      return input;
+    });
+
+    switches.forEach((input) => {
+      expect(input.checked).toBe(true);
+      input.checked = false;
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    for (const field of fields) {
+      expect(app.getSettings()[field]).toBe(false);
+      expect(settingsStore.load()[field]).toBe(false);
+    }
+  });
+
+  it("picks and previews explosion styles", () => {
+    const sound = soundSpy();
+    const { root, app, settingsStore } = mount({ sound });
+    button(root, "settings").click();
+
+    expect(explosionStyleButton(root, "pop").getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+
+    explosionStyleButton(root, "boom").click();
+    expect(sound.setExplosionStyle).toHaveBeenCalledWith("boom");
+    expect(sound.explode).toHaveBeenCalledTimes(1);
+    expect(app.getSettings().explosionStyle).toBe("boom");
+    expect(settingsStore.load().explosionStyle).toBe("boom");
+    expect(explosionStyleButton(root, "boom").getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+
+    explosionStyleButton(root, "crackle").click();
+    expect(sound.explode).toHaveBeenCalledTimes(2);
+    button(root, "preview-explosion").click();
+    expect(sound.explode).toHaveBeenCalledTimes(3);
   });
 
   it("enables grow mode by default and persists the switch", () => {
@@ -788,6 +907,79 @@ describe("placing orbs", () => {
     expect(ghosts(0, 3)).toBe(1);
     expect(ghosts(3, 3)).toBe(1);
     expect(ghosts(3, 1)).toBe(0);
+  });
+
+  it("pulses the owned cell when a Grow-mode player taps elsewhere", () => {
+    const { root, app } = mount();
+    startMatch(root);
+
+    cellButton(root, 3, 3).click();
+    cellButton(root, 6, 6).click();
+    cellButton(root, 0, 0).click();
+
+    expect(app.getState().moveCount).toBe(2);
+    expect(cellButton(root, 3, 3).className).toContain("cell--ping");
+  });
+
+  it("retires the Grow-mode ping once the opening cell explodes", () => {
+    const { root, app } = mount();
+    startMatch(root);
+
+    cellButton(root, 0, 0).click(); // Player 1's opening corner.
+    cellButton(root, 6, 6).click(); // Player 2 takes a turn.
+    cellButton(root, 0, 0).click(); // The corner reaches capacity and bursts.
+    cellButton(root, 6, 6).click(); // The other corner bursts; turn returns.
+
+    expect(app.getState().currentPlayer).toBe(1);
+
+    cellButton(root, 6, 6).click(); // Illegal for a Grow-mode Player 1.
+
+    expect(app.getState().moveCount).toBe(4);
+    expect(root.querySelectorAll(".cell--ping")).toHaveLength(0);
+  });
+
+  it("plays a tap sound and a sound for each detonation", () => {
+    const sound = soundSpy();
+    const board = emptyBoard(7, 7);
+    setCell(board, 3, 3, cell(1, 3)); // one orb from bursting
+    const { root } = mount({
+      seed: makeState(board, {
+        currentPlayer: 1,
+        hasPlayed: { 1: true, 2: true },
+      }),
+      sound,
+    });
+    resumeMatch(root);
+
+    cellButton(root, 3, 3).click();
+
+    expect(sound.place).toHaveBeenCalledTimes(1);
+    expect(sound.explode).toHaveBeenCalled();
+  });
+
+  it("honours the per-sound switches", () => {
+    const sound = soundSpy();
+    const board = emptyBoard(7, 7);
+    setCell(board, 3, 3, cell(1, 3));
+    const { root } = mount({
+      seed: makeState(board, {
+        currentPlayer: 1,
+        hasPlayed: { 1: true, 2: true },
+      }),
+      settings: {
+        ...defaultSettings(),
+        bot: false,
+        soundTap: false,
+        soundExplosion: false,
+      },
+      sound,
+    });
+    resumeMatch(root);
+
+    cellButton(root, 3, 3).click();
+
+    expect(sound.place).not.toHaveBeenCalled();
+    expect(sound.explode).not.toHaveBeenCalled();
   });
 });
 
@@ -1179,6 +1371,29 @@ describe("Bot opponent", () => {
       expect(app.getState().moveCount).toBe(saved.moveCount + 1);
       expect(app.getState().currentPlayer).toBe(1);
       expect(status(root)).toBe("Player 1 to move");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("uses a distinct sound for the Bot's placement", () => {
+    vi.useFakeTimers();
+    try {
+      const sound = soundSpy();
+      const { root } = mount({
+        sound,
+        settings: { ...defaultSettings(), bot: true, difficulty: "medium" },
+      });
+      startMatch(root);
+
+      cellButton(root, 0, 0).click();
+
+      expect(sound.place).toHaveBeenCalledTimes(1);
+      expect(sound.botPlace).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(1000);
+
+      expect(sound.botPlace).toHaveBeenCalledTimes(1);
     } finally {
       vi.useRealTimers();
     }

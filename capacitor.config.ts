@@ -12,6 +12,16 @@ const config: CapacitorConfig = {
     backgroundColor: "#0f1115",
     allowMixedContent: false,
   },
+  plugins: {
+    SplashScreen: {
+      // The app reveals the splash it hides after the first screen is ready.
+      launchAutoHide: false,
+      launchFadeOutDuration: 500,
+      backgroundColor: "#0f1115",
+      androidSplashResourceName: "splash",
+      showSpinner: false,
+    },
+  },
 };
 
 export default config;
