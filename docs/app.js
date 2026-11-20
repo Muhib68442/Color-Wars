@@ -109,7 +109,7 @@ function downloadButton(download) {
 
   if (!ready) {
     console.warn(
-      "Color Wars: set download.url in site/content.json to a real APK URL.",
+      "Color Wars: set download.url in docs/content.json to a real APK URL.",
     );
     return el(
       "button",

@@ -28,3 +28,7 @@ android/local.properties
 *.keystore
 *.jks
 keystore.properties
+
+# Local-only development notes; GitHub Pages publishes docs/README.md and the site assets
+docs/*.md
+!docs/README.md

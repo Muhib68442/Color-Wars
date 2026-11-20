@@ -15,21 +15,21 @@ install also starts against an **Easy Bot**; both the Bot and its difficulty can
 be changed in Settings.
 
 The **web implementation is the product**. It will ship as an Android app built
-with Capacitor (see [`docs/ANDROID.md`](docs/ANDROID.md)). The Pygame prototype
-in `legacy/main.py` is archived for reference and is no longer maintained.
+with Capacitor (see the local `docs/ANDROID.md` notes). The Pygame prototype in
+`legacy/main.py` is archived for reference and is no longer maintained.
 
-The public download/landing page lives in [`site/`](site/README.md). All of its
-editable text, links and metadata are in [`site/content.json`](site/content.json).
+The public download/landing page lives in [`docs/`](docs/README.md) so GitHub
+Pages can publish it from the repository's `/docs` folder. All of its editable
+text, links and metadata are in [`docs/content.json`](docs/content.json).
 
 > **Status: feature-complete `1.0.2` build.** The pure engine, home/menu flow,
 > settings, light/dark themes, multi-player boards, save/resume, Bot opponent,
 > Grow mode, and the new audio/transition UX are covered by 149 Vitest tests.
-> The Capacitor Android shell has both debug and signed release APKs; the
-> release APK was installed and played on a device. Those artifacts predate the
-> latest UX pass, so rerun `npm run android:sync` and `assembleRelease` before
-> distributing. The version stays `1.0.2` because this is still the initial,
-> unpublished release. See the [roadmap](#roadmap) and
-> [`docs/RELEASE.md`](docs/RELEASE.md).
+> The Capacitor Android shell has both debug and signed release APKs. The
+> signed release APK was rebuilt with the latest UX changes; an earlier build
+> was installed and played on a device. The version stays `1.0.2` because this
+> is still the initial, unpublished release. See the [roadmap](#roadmap) and the
+> local `docs/RELEASE.md` notes.
 >
 > Artifacts: `android/app/build/outputs/apk/debug/app-debug.apk` and
 > `android/app/build/outputs/apk/release/app-release.apk`.
@@ -97,7 +97,7 @@ and **About**, plus **Resume** when an unfinished saved match exists.
 - The in-match menu offers How to play, Restart, and Back to home. When the game
   ends, a result dialog appears and the board is locked until you start again.
 
-See [`docs/UI.md`](docs/UI.md) for the full screen and component reference.
+See the local `docs/UI.md` notes for the full screen and component reference.
 
 ---
 
@@ -123,12 +123,13 @@ Color Wars/
 ├── package.json
 ├── tsconfig.json
 ├── vite.config.ts
-├── docs/
-│   ├── ARCHITECTURE.md # Code structure, data flow, target architecture
-│   ├── ALGORITHM.md    # Game rules, state, and cascade algorithm
-│   ├── UI.md           # Layout, components, states, accessibility
-│   ├── ANDROID.md      # APK/AAB build, signing, compatibility, testing
-│   └── FEATURES.md     # Planned features (currently blank)
+├── docs/               # GitHub Pages landing page (served from /docs)
+│   ├── index.html
+│   ├── styles.css
+│   ├── app.js
+│   ├── content.json
+│   ├── assets/
+│   └── README.md
 └── README.md
 ```
 
@@ -147,8 +148,8 @@ npm run build          # Vite production build in dist/
 npx cap sync android   # Phase 3
 ```
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §4.3 for the target layout and
-[`docs/ANDROID.md`](docs/ANDROID.md) for the APK pipeline.
+See the local `docs/ARCHITECTURE.md` §4.3 notes for the target layout and
+`docs/ANDROID.md` for the APK pipeline.
 
 ---
 
@@ -184,16 +185,19 @@ regression coverage in the test suite.
 
 ## Documentation
 
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — current code structure,
-  engine/UI/platform contracts, and phase status.
-- [`docs/ALGORITHM.md`](docs/ALGORITHM.md) — rules, state, and the cascade
-  algorithm.
-- [`docs/UI.md`](docs/UI.md) — layout, components, states, and accessibility.
-- [`docs/ANDROID.md`](docs/ANDROID.md) — APK/AAB pipeline, signing, supported
-  Android range, feature parity, and device test matrix.
-- [`docs/RELEASE.md`](docs/RELEASE.md) — exact Windows toolchain setup, build
-  commands, signing, and the future release checklist.
-- [`docs/FEATURES.md`](docs/FEATURES.md) — feature backlog (blank for now).
+Detailed development notes stay in your local working copy and are gitignored
+so `docs/` remains a clean GitHub Pages source. They are not pushed with the
+site:
+
+- `docs/ARCHITECTURE.md` — code structure, engine/UI/platform contracts, and
+  phase status.
+- `docs/ALGORITHM.md` — rules, state, and the cascade algorithm.
+- `docs/UI.md` — layout, components, states, and accessibility.
+- `docs/ANDROID.md` — APK/AAB pipeline, signing, Android range, and device
+  testing.
+- `docs/RELEASE.md` — Windows toolchain, build commands, signing, and release
+  checklist.
+- `docs/FEATURES.md` — feature backlog (blank for now).
 
 ---
 
@@ -209,5 +213,5 @@ regression coverage in the test suite.
 | 3 | Capacitor 8 shell, Android project, Preferences persistence hardening, device matrix | done; debug and release APKs built and device-tested |
 | 4 | signing, release build, Play checklist, hardening | done locally; rebuild for latest UX + Play deployment pending |
 
-Definition of "stable" for the Android release: see
-[`docs/ANDROID.md`](docs/ANDROID.md) §13.
+Definition of "stable" for the Android release: see the local
+`docs/ANDROID.md` §13 notes.

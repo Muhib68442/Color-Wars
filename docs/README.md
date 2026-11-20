@@ -29,13 +29,13 @@ placeholder the page shows a disabled **Download coming soon** button instead
 of a broken link. Replace it with the direct file URL, for example:
 
 ```json
-"url": "https://raw.githubusercontent.com/muhib68442/Color-Wars/main/site/assets/color-wars-1.0.2.apk"
+"url": "https://raw.githubusercontent.com/muhib68442/Color-Wars/main/docs/assets/color-wars-1.0.2.apk"
 ```
 
 Then update `download.metadata` (version, size, updated date) and the button
 becomes active automatically.
 
-Copy the APK into `site/assets/` if you want to host it from your own domain or
+Copy the APK into `docs/assets/` if you want to host it from your own domain or
 GitHub Pages; `raw.githubusercontent.com` works for a public repository but is
 not intended as a CDN.
 
@@ -44,7 +44,7 @@ not intended as a CDN.
 `fetch()` does not work from a `file://` page, so serve the folder over HTTP:
 
 ```powershell
-cd site
+cd docs
 python -m http.server 5200
 ```
 
@@ -52,9 +52,9 @@ Then open <http://localhost:5200>.
 
 ## Deploy
 
-Publish the **contents of `site/`** (not the repository root) to your web host
+Publish the **contents of `docs/`** (not the repository root) to your web host
 or GitHub Pages branch. `index.html`, `styles.css`, `app.js`, `content.json`
 and `assets/` must stay together in the same folder.
 
 If you change `assets/logo.svg` or `font.ttf` in the game, copy the new file into
-`site/assets/` as well; the landing page is a standalone copy.
+`docs/assets/` as well; the landing page is a standalone copy.
