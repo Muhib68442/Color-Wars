@@ -33,6 +33,7 @@ playerCount   : 1 | 2 | 3 | 4
 currentPlayer : 1 | 2 | 3 | 4
 hasPlayed     : { 1..4: bool }   // opening-move bookkeeping
 botPlayer     : 1..4 | null      // seat driven by the AI, never player 1
+growOnly      : bool             // restrict later moves to cells you own
 gameOver      : bool
 winner        : 1..4 | null
 moveCount     : int
@@ -49,6 +50,8 @@ Invariants:
 - `botPlayer` is `null` for a hot-seat match. When set, it is the
   highest-numbered seat at the table (`2 … playerCount`); player 1 is always
   human, and a solo board has no Bot.
+- `growOnly` is a per-match rule copied from the Settings switch. It can change
+  mid-match; the current board is never rewritten.
 
 Capacity by position (for any rectangular board):
 
@@ -86,6 +89,12 @@ function playTurn(state, cell):
     if cellState is not Empty and cellState.owner != state.currentPlayer:
         return                                  // cannot play on an enemy cell
 
+    if state.growOnly and state.hasPlayed[currentPlayer]:
+        if not ownsAnyCellOf(state, currentPlayer):
+            if cellState is not Empty: return   // re-entry: one free empty cell
+        else if cellState is Empty or cellState.owner != currentPlayer:
+            return                              // grow only on your own cells
+
     if cellState is Empty:
         state.board[cell] = { owner: currentPlayer, orbs: 1 }
     else:
@@ -105,11 +114,14 @@ keeps a newly eliminated player from being handed a turn mid-cascade.
 
 Notes:
 
-- Placing on **any empty cell is always legal**, not only on the opening move.
-  This is a core rule: it is how players claim new territory.
-- Adding to your own cell is also always legal, including on the opening move
-  (some house rules require the first orb to be placed on an empty cell; either
-  is consistent as long as it is enforced).
+- With `growOnly = false` (classic mode), placing on any empty cell is always
+  legal; that is how players claim new territory.
+- With `growOnly = true` (the app default), only the first move is free. Later
+  moves must add an orb to a cell the player already owns, so each player grows
+  outward from their starting cell. A player with no cells left gets one free
+  placement to re-enter. The Bot uses the same `legalMoves` list, so it obeys the
+  active rule automatically.
+- Adding to your own cell is always legal, including on the opening move.
 - The turn only advances after a legal move.
 - With `playerCount === 1` the same player keeps the turn forever; see §5.
 

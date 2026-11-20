@@ -30,6 +30,11 @@ export interface GameState {
   hasPlayed: Record<Player, boolean>;
   /** The seat controlled by the AI, or null for a hot-seat match. */
   botPlayer: Player | null;
+  /**
+   * After a player's first move, restrict them to cells they already own.
+   * The first move (and a re-entry after being wiped off the board) is free.
+   */
+  growOnly: boolean;
   gameOver: boolean;
   winner: Player | null;
   moveCount: number;

@@ -7,6 +7,10 @@ and sends one orb to each orthogonal neighbour, converting enemy orbs along the
 way. The last player with orbs on the board wins. Play hot-seat on one device,
 solo, or against an optional **Bot** with Easy, Medium, and Hard difficulty.
 
+By default **Grow from your cells** is on: after each player's first orb, later
+moves must add to a cell they already own. Switch it off in Settings for the
+classic place-anywhere rule. The switch takes effect immediately.
+
 The **web implementation is the product**. It will ship as an Android app built
 with Capacitor (see [`docs/ANDROID.md`](docs/ANDROID.md)). The Pygame prototype
 in `legacy/main.py` is archived for reference and is no longer maintained.

@@ -60,14 +60,16 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
   let settings = settingsStore.load();
   const loaded = storage.load();
   let hasSave = loaded !== null;
-  let state =
-    loaded ??
-    createGame(
-      settings.gridRows,
-      settings.gridCols,
-      settings.playerCount,
-      botSeatForSettings(),
-    );
+  let state: GameState =
+    loaded !== null
+      ? { ...loaded, growOnly: settings.growOnly }
+      : createGame(
+          settings.gridRows,
+          settings.gridCols,
+          settings.playerCount,
+          botSeatForSettings(),
+          settings.growOnly,
+        );
   let screen: ScreenName = "home";
   let infoReturn: "home" | "game" = "home";
   let botTimer: ReturnType<typeof setTimeout> | null = null;
@@ -363,6 +365,7 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
       `Bot · ${difficultyLabel(settings.difficulty)}`;
 
     refs.bot.checked = settings.bot;
+    refs.growOnly.checked = settings.growOnly;
     refs.botHint.textContent =
       settings.bot && settings.playerCount > 1
         ? `Player ${settings.playerCount} is the Bot. It cannot be renamed.`
@@ -485,6 +488,7 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
       settings.gridCols,
       settings.playerCount,
       botSeatForSettings(),
+      settings.growOnly,
     );
     hasSave = false;
     storage.clear();
@@ -689,6 +693,15 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
     updateHome();
   });
 
+  shell.settingsRefs.growOnly.addEventListener("change", () => {
+    settings.growOnly = shell.settingsRefs.growOnly.checked;
+    // Grow mode takes effect on the board immediately, including mid-match.
+    state = { ...state, growOnly: settings.growOnly };
+    saveSettings();
+    if (hasSave) storage.save(state);
+    render();
+  });
+
   shell.settingsRefs.gridRowsMinus.addEventListener("click", () =>
     changeGridAxis("rows", -1),
   );
@@ -750,6 +763,8 @@ export function createApp(root: HTMLElement, options: AppOptions): App {
 
   shell.settingsRefs.reset.addEventListener("click", () => {
     settings = defaultSettings();
+    state = { ...state, growOnly: settings.growOnly };
+    if (hasSave) storage.save(state);
     applyTheme();
     saveSettings();
     applyPalette();

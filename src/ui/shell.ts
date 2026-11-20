@@ -22,6 +22,7 @@ export interface SettingsRefs {
   playerCountButtons: HTMLButtonElement[];
   bot: HTMLInputElement;
   botHint: HTMLElement;
+  growOnly: HTMLInputElement;
   gridRowsValue: HTMLElement;
   gridRowsMinus: HTMLButtonElement;
   gridRowsPlus: HTMLButtonElement;
@@ -217,8 +218,12 @@ const SHELL_TEMPLATE = /* html */ `
 
       <h3>On your turn</h3>
       <ul>
-        <li>Place a new orb on any empty cell, or</li>
-        <li>add one orb to a cell you already own.</li>
+        <li>Your first orb can go on any empty cell.</li>
+        <li>
+          With Grow from your cells on, later moves must add an orb to a cell
+          you already own.
+        </li>
+        <li>Turn that setting off to place on any empty cell every turn.</li>
       </ul>
       <p>Turns then pass to the next player in order.</p>
 
@@ -295,6 +300,18 @@ const SHELL_TEMPLATE = /* html */ `
 
       <section class="panel" aria-labelledby="settings-match">
         <h3 class="panel__title" id="settings-match">Match</h3>
+
+        <label class="switch">
+          <span class="switch__copy">
+            <span class="switch__title">Grow from your cells</span>
+            <span class="switch__hint">
+              After your first orb, play only on cells you already own. Turn
+              off to place anywhere. Applies immediately.
+            </span>
+          </span>
+          <input type="checkbox" data-setting="grow-only" />
+          <span class="switch__track" aria-hidden="true"></span>
+        </label>
 
         <div class="field">
           <div class="field__head">
@@ -538,6 +555,10 @@ export function mountShell(root: HTMLElement): Shell {
       ),
       bot: requireElement<HTMLInputElement>(root, "[data-setting='bot']"),
       botHint: requireElement<HTMLElement>(root, "[data-role='bot-hint']"),
+      growOnly: requireElement<HTMLInputElement>(
+        root,
+        "[data-setting='grow-only']",
+      ),
       gridRowsValue: requireElement<HTMLElement>(
         root,
         "[data-role='grid-rows-value']",

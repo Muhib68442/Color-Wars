@@ -243,6 +243,7 @@ v1.0.
 | ------------------------------------------------------------- | ----------------------------------------- | ---------------------------------------------- |
 | 7–15 rows × 7–15 columns rectangular board, local 1–4 players | Pure engine + DOM grid                    | Engine tests; tap on device                    |
 | Place on empty / own cell                                     | `applyMove` legality                      | Unit tests; UI test                            |
+| Grow from your cells (default on, applies mid-match)          | `state.growOnly` + `isLegalMove`          | Unit + UI test; device turn check              |
 | Corner 2 / edge 3 / interior 4                                | `capacityAt`                              | Unit tests                                     |
 | Cascades and ownership conversion                             | `resolveCascades` events                  | Unit tests; animation replay                   |
 | Turn indicator                                                | Visible HUD (not hidden)                  | Visual check                                   |
@@ -253,7 +254,7 @@ v1.0.
 | Restart                                                       | New `createGame()`                        | Manual                                         |
 | Input lock after win                                          | `gameOver` guard                          | Unit + UI test                                 |
 | Save / resume                                                 | Preferences on pause and after each move  | Process-death test                             |
-| Settings (theme, grid, players, bot, difficulty, names, colours, feedback) | `platform/settings.ts`, stored separately | Reload/process-death test; both themes checked |
+| Settings (theme, grow mode, grid, players, bot, difficulty, names, colours, feedback) | `platform/settings.ts`, stored separately | Reload/process-death test; both themes checked |
 | Android back button                                           | `@capacitor/app` listener                 | Hardware/gesture test                          |
 | Rotation / split screen                                       | Responsive CSS + safe areas               | Matrix test                                    |
 | Offline launch                                                | Bundled assets                            | Airplane-mode test                             |
@@ -285,16 +286,19 @@ server; it does not change the packaging model.
 - Save after every accepted move (debounced ~150 ms) and on `pause`.
 - Save schema:
   ```ts
-  type SaveV3 = { version: 3; state: GameState; savedAt: number };
+  type SaveV4 = { version: 4; state: GameState; savedAt: number };
   ```
 
-  `GameState` carries `playerCount` (1–4), `hasPlayed` for all four seats, and
-  `botPlayer` (the AI seat, or `null` for hot-seat). Version-2 saves are migrated
-  on load with `botPlayer: null`.
+  `GameState` carries `playerCount` (1–4), `hasPlayed` for all four seats,
+  `botPlayer` (the AI seat, or `null` for hot-seat), and `growOnly` (the active
+  placement rule). Version-2 saves are migrated on load with `botPlayer: null`;
+  versions 2 and 3 are migrated with `growOnly: true`.
 - Settings are stored separately under `color-wars:settings` as
-  `{ version: 4, settings: GameSettings }` (`theme`, `gridRows`, `gridCols`,
-  `bot`). Settings v1/v2 are migrated on load; a missing or invalid theme becomes
-  `light`, and a missing `bot` flag becomes `false`.
+  `{ version: 5, settings: GameSettings }` (`theme`, `growOnly`, `gridRows`,
+  `gridCols`, `bot`). Settings v1/v2 are migrated on load; a missing or invalid
+  theme becomes `light`, a missing `bot` flag becomes `false`, and a missing
+  `growOnly` flag becomes `true`. The Grow switch updates the live match as well
+  as future games.
 - On launch: validate the schema, check the row/column range, player count, Bot
   seat, owner range, and stability. If anything is invalid — including a
   version-1 save — start a new game instead of restoring a corrupt state.

@@ -18,7 +18,7 @@ dialog. Only one screen is visible at a time (`hidden` attribute).
 | --- | --- | --- |
 | **Home** | Branding and the five top-level actions | Launch, Back to home |
 | **Match** | The board, one score card per active player, and turn status | **Resume**, **New game** |
-| **Settings** | Theme, grid, player count, Bot opponent and difficulty, names, colours, sound, vibration | Home **Settings** |
+| **Settings** | Theme, grow mode, grid, player count, Bot opponent and difficulty, names, colours, sound, vibration | Home **Settings** |
 | **How to play** | Rules, controls, and tips | Home **How to play**, in-match menu |
 | **About** | Logo, name, version, last updated, website link | Home **About** |
 | **Dialog** | Result, restart confirmation, game menu | Game events, menu button |
@@ -123,8 +123,9 @@ of cards:
 
 1. **Appearance** — Light / Dark theme segmented control. Applies immediately to
    every screen and is saved.
-2. **Match** — difficulty segmented control with a live `Bot · <Difficulty>`
-   badge, grid stepper.
+2. **Match** — a **Grow from your cells** switch (on by default, applied
+   immediately), difficulty segmented control with a live `Bot · <Difficulty>`
+   badge, and grid stepper.
 3. **Players** — player-count segmented control (1–4), a **Bot opponent** switch,
    and one row per player with a colour swatch and a name field. Rows above the
    selected count are hidden. The Bot seat uses the label and value `Bot`, and its
@@ -198,6 +199,7 @@ body
     │       │   └── div.segmented[data-role="theme"]
     │       │       └── button[data-theme-option="light|dark"]
     │       ├── section.panel                        Match
+    │       │   ├── label.switch > input[data-setting="grow-only"]
     │       │   ├── div.segmented[data-role="difficulty"]
     │       │   │   └── button[data-difficulty="easy|medium|hard"]
     │       │   ├── span.badge[data-role="difficulty-badge"]
@@ -473,6 +475,10 @@ exceeds `state.playerCount`.
   `<html data-theme="…">` immediately across every screen, regenerates the
   theme-aware player palette, and saves the choice. The same value is applied on
   startup, and an inline head script reads the saved value before first paint.
+- **Grow from your cells** switch: on by default. After a player's first orb,
+  only cells owned by that player are legal; with the switch off, empty cells are
+  legal again. A player wiped off the board gets one free placement. The change
+  applies to the current match and is saved immediately.
 - **Difficulty** segmented control: Easy / Medium / Hard. The badge reads
   `Bot · <Difficulty>` and the choice is saved immediately. Easy plays a random
   legal move, Medium greedily builds its own cells and attacks rival ones, and
@@ -500,17 +506,19 @@ exceeds `state.playerCount`.
 - **Reset to defaults** restores the full default settings object and saves it.
 
 All settings are written to `color-wars:settings` as
-`{ version: 4, settings: GameSettings }` on every change. Version-1 blobs that
+`{ version: 5, settings: GameSettings }` on every change. Version-1 blobs that
 stored a single square `gridSize` are migrated onto both axes on load;
-version-1/2 blobs without a theme default to light; and version 1–3 blobs
-without a `bot` flag default it to off.
+version-1/2 blobs without a theme default to light; version 1–3 blobs without a
+`bot` flag default it to off; and older blobs without `growOnly` default it to
+on.
 
 ### 5.8 How to play screen
 
 - Header with a back button and the title, then a scrollable rules document.
-- Covers goal, legal moves, capacities and the dashed next-orb slot, cascade
-  behaviour, multi-player elimination, solo practice, the optional Bot and its
-  three difficulties, keyboard controls, and a strategy tip.
+- Covers goal, legal moves (first orb anywhere, then Grow mode restricts moves
+  to owned cells), capacities and the dashed next-orb slot, cascade behaviour,
+  multi-player elimination, solo practice, the optional Bot and its three
+  difficulties, keyboard controls, and a strategy tip.
 - Opened from the home screen or from the in-match menu; the back button
   returns to the opener.
 

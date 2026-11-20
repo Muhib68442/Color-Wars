@@ -11,7 +11,7 @@ import {
 import { isRecord, type KeyValueStore } from "./storage.js";
 
 export const SETTINGS_KEY = "color-wars:settings";
-export const SETTINGS_VERSION = 4;
+export const SETTINGS_VERSION = 5;
 export const MAX_NAME_LENGTH = 16;
 
 export type { Difficulty };
@@ -30,6 +30,8 @@ export interface GameSettings {
   playerCount: PlayerCount;
   /** Makes the highest-numbered player an AI opponent in new games. */
   bot: boolean;
+  /** Play only on owned cells after the first move; applies immediately. */
+  growOnly: boolean;
   profiles: Record<Player, PlayerProfile>;
   sound: boolean;
   vibration: boolean;
@@ -58,6 +60,7 @@ export function defaultSettings(): GameSettings {
     gridCols: MIN_GRID_SIZE,
     playerCount: 2,
     bot: false,
+    growOnly: true,
     profiles: {
       1: { ...DEFAULT_PROFILES[1] },
       2: { ...DEFAULT_PROFILES[2] },
@@ -158,6 +161,10 @@ export function normalizeSettings(value: unknown): GameSettings {
     ),
     playerCount,
     bot,
+    growOnly:
+      typeof value["growOnly"] === "boolean"
+        ? value["growOnly"]
+        : defaults.growOnly,
     profiles,
     sound: typeof value["sound"] === "boolean" ? value["sound"] : defaults.sound,
     vibration:

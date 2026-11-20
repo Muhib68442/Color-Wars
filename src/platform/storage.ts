@@ -9,8 +9,8 @@ import {
 } from "../engine/index.js";
 
 export const SAVE_KEY = "color-wars:save";
-export const SAVE_VERSION = 3;
-/** Version 2 saves are accepted and migrated with no Bot seat. */
+export const SAVE_VERSION = 4;
+/** Older saves are accepted and migrated to the current state shape. */
 export const MIN_SAVE_VERSION = 2;
 
 export interface KeyValueStore {
@@ -130,6 +130,9 @@ export function isGameState(value: unknown): value is GameState {
     return false;
   }
 
+  // Grow mode was added after version 3; the migration supplies it for old saves.
+  if ("growOnly" in value && typeof value["growOnly"] !== "boolean") return false;
+
   // A capped cascade is a safety stop, not a resumable game.
   if (value["cascadeLimitReached"] !== false) return false;
 
@@ -147,8 +150,10 @@ export function parseSave(raw: string): GameState | null {
   if (!isRecord(parsed)) return null;
   const version = parsed["version"];
   if (
-    version !== SAVE_VERSION &&
-    version !== MIN_SAVE_VERSION
+    typeof version !== "number" ||
+    !Number.isInteger(version) ||
+    version < MIN_SAVE_VERSION ||
+    version > SAVE_VERSION
   ) {
     return null;
   }
@@ -156,9 +161,14 @@ export function parseSave(raw: string): GameState | null {
   const stored = parsed["state"];
   if (!isRecord(stored)) return null;
 
-  // Version 2 had no Bot seat; migrate it to a plain hot-seat match.
-  const state =
-    version === MIN_SAVE_VERSION ? { ...stored, botPlayer: null } : stored;
+  // Version 2 had no Bot seat; version 3 had no grow-mode flag. Both are
+  // migrated so existing saves keep working with the new defaults.
+  const state = {
+    ...stored,
+    botPlayer: version === MIN_SAVE_VERSION ? null : stored.botPlayer,
+    growOnly:
+      typeof stored["growOnly"] === "boolean" ? stored["growOnly"] : true,
+  };
   if (!isGameState(state)) return null;
 
   return state;

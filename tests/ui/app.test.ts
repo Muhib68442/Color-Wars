@@ -522,6 +522,26 @@ describe("settings", () => {
     expect(settingsStore.load().vibration).toBe(true);
   });
 
+  it("enables grow mode by default and persists the switch", () => {
+    const { root, app, settingsStore, store } = mount();
+
+    button(root, "settings").click();
+    const grow = settingsRoot(root).querySelector<HTMLInputElement>(
+      "[data-setting='grow-only']",
+    );
+    if (grow === null) throw new Error("Missing grow switch");
+
+    expect(grow.checked).toBe(true);
+    expect(app.getSettings().growOnly).toBe(true);
+
+    grow.checked = false;
+    grow.dispatchEvent(new Event("change", { bubbles: true }));
+
+    expect(app.getSettings().growOnly).toBe(false);
+    expect(settingsStore.load().growOnly).toBe(false);
+    expect(JSON.parse(store.getItem("color-wars:settings") ?? "{}").settings.growOnly).toBe(false);
+  });
+
   it("persists settings across a reload", () => {
     const store = memoryStore();
     const first = mount({ store });
@@ -662,20 +682,54 @@ describe("placing orbs", () => {
     expect(app.getState().currentPlayer).toBe(2);
   });
 
-  it("still allows a new placement after both opening moves", () => {
+  it("restricts later moves to owned cells in grow mode", () => {
     const { root, app } = mount();
     startMatch(root);
 
-    cellButton(root, 0, 0).click();
+    cellButton(root, 3, 3).click();
     cellButton(root, 6, 6).click();
+    cellButton(root, 4, 4).click();
+
+    expect(orbsOn(root, 4, 4)).toBe(0);
+    expect(app.getState().moveCount).toBe(2);
+
     cellButton(root, 3, 3).click();
 
-    expect(orbsOn(root, 3, 3)).toBe(1);
+    expect(orbsOn(root, 3, 3)).toBe(2);
     expect(app.getState().moveCount).toBe(3);
   });
 
-  it("ignores a click on an enemy cell", () => {
+  it("applies a grow-mode change to the match already in progress", () => {
     const { root, app } = mount();
+    startMatch(root);
+
+    cellButton(root, 3, 3).click();
+    cellButton(root, 6, 6).click();
+    expect(app.getState().growOnly).toBe(true);
+
+    button(root, "menu").click();
+    action(root, "Back to home").click();
+    button(root, "settings").click();
+    const grow = settingsRoot(root).querySelector<HTMLInputElement>(
+      "[data-setting='grow-only']",
+    );
+    if (grow === null) throw new Error("Missing grow switch");
+    grow.checked = false;
+    grow.dispatchEvent(new Event("change", { bubbles: true }));
+
+    expect(app.getState().growOnly).toBe(false);
+
+    button(root, "settings-back").click();
+    resumeMatch(root);
+    cellButton(root, 4, 4).click();
+
+    expect(orbsOn(root, 4, 4)).toBe(1);
+  });
+
+  it("ignores a click on an enemy cell", () => {
+    const { root, app } = mount({
+      settings: { ...defaultSettings(), growOnly: false },
+    });
     startMatch(root);
 
     cellButton(root, 0, 0).click();

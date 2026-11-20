@@ -118,6 +118,28 @@ describe("save schema", () => {
     expect(parsed?.botPlayer).toBeNull();
   });
 
+  it("migrates a version-3 save by enabling grow mode", () => {
+    const { growOnly: _ignored, ...legacy } = startedGame();
+    const payload = JSON.stringify({
+      version: 3,
+      savedAt: 0,
+      state: legacy,
+    });
+
+    expect(parseSave(payload)?.growOnly).toBe(true);
+  });
+
+  it("keeps an explicit grow-mode value", () => {
+    const state = { ...startedGame(), growOnly: false };
+    const payload = JSON.stringify({
+      version: SAVE_VERSION,
+      savedAt: 0,
+      state,
+    });
+
+    expect(parseSave(payload)?.growOnly).toBe(false);
+  });
+
   it("rejects a different new version", () => {
     const payload = JSON.stringify({
       version: SAVE_VERSION + 1,

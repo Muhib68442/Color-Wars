@@ -294,7 +294,7 @@ Pygame, Capacitor, or storage.
 
 | Export | Responsibility |
 | --- | --- |
-| `createGame(rows, cols, playerCount, botPlayer)` | Initial `GameState` for 1–4 players with an optional AI seat; defaults to 7×7, 2 players, no Bot |
+| `createGame(rows, cols, playerCount, botPlayer, growOnly)` | Initial `GameState` for 1–4 players with an optional AI seat and grow-mode rule; defaults to 7×7, 2 players, no Bot, classic placement |
 | `capacityAt(rows, cols, row, col)` | 2 / 3 / 4 by position |
 | `getCell` / `setCell` | Bounds-safe board access |
 | `legalMoves(state)` / `isLegalMove(state, move)` | Move validation |
@@ -386,25 +386,30 @@ replaced them.
 #### Save and settings schemas
 
 ```
-Save     = { version: 3, savedAt: number, state: GameState }
-Settings = { version: 4, settings: GameSettings }
+Save     = { version: 4, savedAt: number, state: GameState }
+Settings = { version: 5, settings: GameSettings }
 ```
 
 `GameSettings` stores `theme` (`light` or `dark`), `gridRows` and `gridCols`
-separately (each 7–15), and a `bot` flag that gives the highest-numbered seat to
-the AI. Version-1 settings that used a single square `gridSize` are normalized
-onto both axes on load; settings without a valid theme (v1/v2) default to light;
-settings without `bot` (v1–v3) default it to off. The theme is applied to
+separately (each 7–15), a `bot` flag that gives the highest-numbered seat to the
+AI, and a `growOnly` flag (on by default) that restricts later moves to cells
+the player already owns. Version-1 settings that used a single square `gridSize`
+are normalized onto both axes on load; settings without a valid theme (v1/v2)
+default to light; settings without `bot` (v1–v3) default it to off; settings
+without `growOnly` default it to on. The theme is applied to
 `<html data-theme="…">`, and a small inline script in `index.html` reads the
 saved value before first paint.
 
-`SAVE_VERSION = 3` adds `GameState.botPlayer` to the multi-player,
-variable-grid state shape. `parseSave` accepts version 2 and migrates it with
-`botPlayer: null`, so an existing hot-seat save resumes unchanged. Version-1
-saves are rejected by `parseSave` and removed from the store, so an older save
-can never half-load into the new renderer. Phase 3 migrates the same payloads
-to `@capacitor/preferences`; a migration hook can map v1 → v2 → v3 there if
-resuming old games becomes a requirement.
+`SAVE_VERSION = 4` adds `GameState.growOnly` to the multi-player, variable-grid
+state shape. `parseSave` accepts versions 2 and 3: version 2 is migrated with
+`botPlayer: null`, and version 3 (and any older state without the flag) is
+migrated with `growOnly: true`, so existing saves resume under the new default
+rule. The app also copies the current settings value onto a resumed state, and
+the Settings switch updates an in-progress match immediately without rewriting
+the board. Version-1 saves are rejected by `parseSave` and removed from the
+store, so an older save can never half-load into the new renderer. Phase 3
+migrates the same payloads to `@capacitor/preferences`; a migration hook can map
+v1 → v2 → v3 → v4 there if resuming old games becomes a requirement.
 
 ### 4.5 Android packaging
 
@@ -425,7 +430,12 @@ Studio 2025.2.1+, fully offline assets, no runtime permissions required.
   `legalMoves` + `applyMove`, with Easy, Medium, and Hard difficulty. The
   heuristic rewards stacking and armed attacks; Hard adds a 2-ply minimax over
   the strongest root moves and replies. The Bot seat is stored in
-  `GameState.botPlayer` and persisted.
+  `GameState.botPlayer` and persisted. The Bot obeys Grow mode automatically
+  because it searches the same `legalMoves` list the rule restricts.
+- **Grow mode:** done — `isLegalMove` reads `state.growOnly`, copied from the
+  Settings switch. After a player's first orb it permits only cells that player
+  already owns, with a free placement when they have been wiped off the board.
+  The switch applies to the current match immediately.
 - **Undo:** snapshot the state before each move.
 - **Network play:** serialise `applyMove` inputs or event streams.
 - **Persistence:** store the board as a compact string (`0`–`4` plus orb
@@ -441,7 +451,7 @@ Studio 2025.2.1+, fully offline assets, no runtime permissions required.
 ## 6. Testing strategy
 
 The engine is tested with **Vitest** (`npm test`), independently of the DOM and
-of Capacitor. The suite currently has **120 tests across 9 files**.
+of Capacitor. The suite currently has **139 tests across 12 files**.
 
 1. **Board and capacity** (`tests/engine/board.test.ts`)
    - corners 2, edges 3, interior 4;
@@ -449,13 +459,16 @@ of Capacitor. The suite currently has **120 tests across 9 files**.
    - degenerately small boards are rejected;
    - `alivePlayers` / `nextPlayer` keep unplayed players alive and skip
      eliminated ones.
-2. **Move legality and turns** (`tests/engine/moves.test.ts`)
+2. **Move legality and turns** (`tests/engine/moves.test.ts`,
+   `tests/engine/grow.test.ts`)
    - empty cells and own cells are legal;
    - enemy cells, out-of-bounds moves, and moves after game over are rejected
      without mutating state;
    - `createGame(rows, cols, playerCount)` builds the requested rectangular
      board;
-   - turns cycle 1→2→3→4→1 and skip eliminated players.
+   - turns cycle 1→2→3→4→1 and skip eliminated players;
+   - grow mode allows a free first move, then restricts to owned cells, grants
+     a wiped-out player one free placement, and is preserved across moves.
 3. **Cascades** (`tests/engine/cascade.test.ts`)
    - a detonation clears the source and spreads to exactly the in-bounds
      neighbours;
@@ -483,17 +496,19 @@ of Capacitor. The suite currently has **120 tests across 9 files**.
    - Hard rejects the greedy move when it leaves an opponent's armed cell, and
      keeps more orbs after the opponent's best reply.
 7. **Storage and settings** (`tests/platform/`)
-   - save round-trip, corrupt-save rejection, v1 rejection, v2 → v3 migration,
-     four-player 15×15 round-trip, Bot-seat validation, unstable-board refusal;
-   - settings defaults, clamping, Bot normalisation, theme validation and
-     migration, name/colour sanitisation, colour blending, persistence, and
+   - save round-trip, corrupt-save rejection, v1 rejection, v2 → v4 migration,
+     v3 → v4 grow-mode migration, explicit grow-mode preservation, four-player
+     15×15 round-trip, Bot-seat validation, unstable-board refusal;
+   - settings defaults (Grow on), clamping, Bot normalisation, theme validation
+     and migration, name/colour sanitisation, colour blending, persistence, and
      corrupt-data fallback.
 8. **UI tests** (`tests/ui/app.test.ts`, jsdom)
    - the home screen gates the match and all five actions exist;
    - **New game** clears the save, **Resume** restores an unfinished match;
-   - settings change theme/grid/player count/Bot/difficulty/names/colours/sound/
-     vibration and persist across a reload; the theme applies to the document
-     root;
+   - settings change theme/grow mode/grid/player count/Bot/difficulty/names/
+     colours/sound/vibration and persist across a reload; Grow defaults to on
+     and applies to an in-progress match immediately; the theme applies to the
+     document root;
    - the Bot seat is named `Bot`, cannot be renamed, auto-plays after the human
      move, and resumes from a saved Bot turn;
    - four-player layout order (`3`, `2`, `board`, `1`, `4`) and hidden rails;

@@ -26,6 +26,7 @@ export function createGame(
   cols = 7,
   playerCount: PlayerCount = 2,
   botPlayer: Player | null = null,
+  growOnly = false,
 ): GameState {
   const seat =
     botPlayer !== null && botPlayer > 1 && botPlayer <= playerCount
@@ -40,6 +41,7 @@ export function createGame(
     currentPlayer: 1,
     hasPlayed: { 1: false, 2: false, 3: false, 4: false },
     botPlayer: seat,
+    growOnly,
     gameOver: false,
     winner: null,
     moveCount: 0,
@@ -55,11 +57,28 @@ export function cloneState(state: GameState): GameState {
   };
 }
 
+/**
+ * True when the active player still owns at least one cell.
+ * Used to give a wiped-out player one free placement in Grow mode.
+ */
+function ownsAnyCell(state: GameState): boolean {
+  return state.board.some((row) =>
+    row.some((cell) => cell?.owner === state.currentPlayer),
+  );
+}
+
 export function isLegalMove(state: GameState, move: CellRef): boolean {
   if (state.gameOver) return false;
   if (!inBounds(state.board, move.row, move.col)) return false;
 
   const cell = getCell(state.board, move.row, move.col);
+
+  if (state.growOnly && state.hasPlayed[state.currentPlayer]) {
+    // A player with no cells left gets a free placement to re-enter the game.
+    if (!ownsAnyCell(state)) return cell === null;
+    return cell?.owner === state.currentPlayer;
+  }
+
   return cell === null || cell.owner === state.currentPlayer;
 }
 
