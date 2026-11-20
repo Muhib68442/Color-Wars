@@ -177,6 +177,12 @@ export function createBoardView(
         const capacity = capacityAt(state.rows, state.cols, row, col);
         const legal = !locked && isLegal(state, { row, col });
         const orbs = cell?.orbs ?? 0;
+        // Cells have four orb slots. A cell can briefly overshoot its capacity
+        // while a cascade resolves, so cap the drawn count at the slot count.
+        const shown = Math.min(orbs, node.orbs.length);
+        // A cell one orb from bursting shows a dashed slot for the next orb, so
+        // a corner/edge capacity is readable at a glance.
+        const armed = cell !== null && orbs === capacity - 1;
         const profile = cell === null ? null : profiles[cell.owner];
         const name =
           cell === null
@@ -185,7 +191,7 @@ export function createBoardView(
               ? BOT_NAME
               : profile?.name ?? `Player ${cell.owner}`;
 
-        node.button.dataset.orbs = String(orbs);
+        node.button.dataset.orbs = String(shown);
         node.button.dataset.capacity = String(capacity);
         node.button.title = cell
           ? `${name}: ${orbs} / ${capacity} orbs`
@@ -221,7 +227,8 @@ export function createBoardView(
         for (let index = 0; index < node.orbs.length; index += 1) {
           const orb = node.orbs[index];
           if (orb === undefined) continue;
-          orb.classList.toggle("is-visible", index < orbs);
+          orb.classList.toggle("is-visible", index < shown);
+          orb.classList.toggle("is-ghost", armed && index === shown);
         }
       }
     }

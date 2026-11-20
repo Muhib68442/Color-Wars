@@ -225,7 +225,8 @@ const SHELL_TEMPLATE = /* html */ `
       <h3>Explosions</h3>
       <p>
         A cell explodes when it reaches its capacity: 2 orbs in a corner,
-        3 on an edge, 4 in the middle.
+        3 on an edge, 4 in the middle. A dashed slot shows the orb that will
+        make the cell burst.
       </p>
       <ul>
         <li>An exploding cell clears itself.</li>
@@ -413,37 +414,17 @@ const SHELL_TEMPLATE = /* html */ `
         <div class="about__logo">${LOGO}</div>
         <h3 class="about__name">Color Wars</h3>
         <p class="about__version">Version ${__APP_VERSION__}</p>
+        <p class="about__updated">Last updated ${__APP_UPDATED__}</p>
       </div>
 
-      <p>
-        A local chain reaction game for one to four players. Place orbs, trigger
-        cascades, and be the last colour on the board.
-      </p>
-
-      <h3>Built for one device</h3>
-      <p>
-        Everyone shares the same screen. Player 1 sits at the bottom, Player 2
-        at the top, and Players 3 and 4 on the left and right for four-player
-        matches.
-      </p>
-
-      <h3>Private and offline</h3>
-      <p>
-        No accounts, no ads, no tracking, and no network requests. Saves and
-        settings stay in this device's local storage.
-      </p>
-
-      <h3>Tech</h3>
-      <p>
-        TypeScript and Vite, with a pure rules engine and a DOM renderer.
-        Packaged for Android with Capacitor.
-      </p>
-
-      <h3>Credits</h3>
-      <p>
-        Game design and code by the Color Wars project. Built as a modern
-        rewrite of the original Pygame prototype.
-      </p>
+      <a
+        class="btn btn--secondary about__site"
+        href="https://muhib68442.github.io/Color-Wars"
+        target="_blank"
+        rel="noopener noreferrer"
+        title="muhib68442.github.io/Color-Wars"
+        aria-label="Open the Color Wars website"
+      >Visit website</a>
     </div>
   </section>
 

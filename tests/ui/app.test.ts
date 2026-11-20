@@ -587,6 +587,15 @@ describe("how to play and about", () => {
     expect(root.querySelector(".about__version")?.textContent).toBe(
       `Version ${__APP_VERSION__}`,
     );
+    expect(root.querySelector(".about__updated")?.textContent).toBe(
+      `Last updated ${__APP_UPDATED__}`,
+    );
+
+    const site = root.querySelector<HTMLAnchorElement>(".about__site");
+    expect(site?.textContent?.trim()).toBe("Visit website");
+    expect(site?.href).toBe("https://muhib68442.github.io/Color-Wars");
+    expect(site?.target).toBe("_blank");
+    expect(site?.rel).toBe("noopener noreferrer");
 
     button(root, "about-back").click();
     expect(app.getScreen()).toBe("home");
@@ -706,6 +715,25 @@ describe("placing orbs", () => {
     expect(status(root)).toBe("Player 1 · solo practice");
     expect(app.getState().playerCount).toBe(1);
     expect(app.getState().currentPlayer).toBe(1);
+  });
+
+  it("shows a dashed next-orb slot only when a cell is one orb from bursting", () => {
+    const board = emptyBoard(7, 7);
+    setCell(board, 0, 0, cell(1, 1)); // corner, 1 of 2
+    setCell(board, 0, 3, cell(1, 2)); // edge, 2 of 3
+    setCell(board, 3, 3, cell(1, 3)); // interior, 3 of 4
+    setCell(board, 3, 1, cell(1, 2)); // interior, 2 of 4
+
+    const { root } = mount({ seed: makeState(board) });
+    resumeMatch(root);
+
+    const ghosts = (row: number, col: number): number =>
+      cellButton(root, row, col).querySelectorAll(".orb.is-ghost").length;
+
+    expect(ghosts(0, 0)).toBe(1);
+    expect(ghosts(0, 3)).toBe(1);
+    expect(ghosts(3, 3)).toBe(1);
+    expect(ghosts(3, 1)).toBe(0);
   });
 });
 

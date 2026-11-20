@@ -11,10 +11,13 @@ The **web implementation is the product**. It will ship as an Android app built
 with Capacitor (see [`docs/ANDROID.md`](docs/ANDROID.md)). The Pygame prototype
 in `legacy/main.py` is archived for reference and is no longer maintained.
 
+The public download/landing page lives in [`site/`](site/README.md). All of its
+editable text, links and metadata are in [`site/content.json`](site/content.json).
+
 > **Status: playable web build.** The pure engine, home/menu flow, settings,
 > light/dark themes, multi-player boards, save/resume, and the Bot opponent are
-> complete and covered by 126 Vitest tests. The Capacitor Android shell is in
-> place and the `1.0.1` debug APK builds; device testing and release signing are
+> complete and covered by 129 Vitest tests. The Capacitor Android shell is in
+> place and the `1.0.2` debug APK builds; device testing and release signing are
 > next. See the [roadmap](#roadmap).
 
 ---

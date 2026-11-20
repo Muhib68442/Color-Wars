@@ -20,7 +20,7 @@ dialog. Only one screen is visible at a time (`hidden` attribute).
 | **Match** | The board, one score card per active player, and turn status | **Resume**, **New game** |
 | **Settings** | Theme, grid, player count, Bot opponent and difficulty, names, colours, sound, vibration | Home **Settings** |
 | **How to play** | Rules, controls, and tips | Home **How to play**, in-match menu |
-| **About** | Version, privacy, and credits | Home **About** |
+| **About** | Logo, name, version, last updated, website link | Home **About** |
 | **Dialog** | Result, restart confirmation, game menu | Game events, menu button |
 
 ```
@@ -140,9 +140,9 @@ content area scrolls independently; the header stays in place.
 
 ### 2.6 About
 
-A header bar and a scrollable document with the app mark, name, `Version 0.2.0`,
-a one-line description, and sections for one-device play, privacy/offline,
-tech, and credits.
+A header bar and a scrollable document, vertically centred, with the app mark,
+name, `Version <package.json version>`, `Last updated <commit date>`, and a
+**Visit website** button linking to `muhib68442.github.io/Color-Wars`.
 
 ---
 
@@ -234,8 +234,8 @@ body
     │   │   ├── h2.infobar__title#about-title              "About"
     │   │   └── span.gamebar__spacer
     │   └── div.info.about
-    │       ├── div.about__brand (logo, name, version)
-    │       └── h3 / p … per topic
+    │       ├── div.about__brand (logo, name, version, last updated)
+    │       └── a.btn.btn--secondary.about__site     website link
     └── dialog.overlay[data-role="overlay"]
         └── div.overlay__card
             ├── p.overlay__eyebrow
@@ -251,6 +251,12 @@ Every cell is a real `<button>`. The four orb spans are decorative
 - `Row 3, column 4, Ada, 2 of 4 orbs` (custom name)
 - `Row 3, column 4, Player 1, 2 of 4 orbs` (default name)
 - `Row 3, column 4, Bot, 2 of 4 orbs` (Bot seat, never a profile name)
+
+`data-orbs` is the drawn orb count, capped at the four orb slots; a cell can
+briefly hold more than its capacity while a cascade resolves. `data-capacity`
+is the cell's corner/edge/interior capacity (2, 3, or 4). A cell one orb from
+bursting renders its next orb slot with the `is-ghost` class, which shows as a
+dashed outline so the capacity is readable at a glance.
 
 The board is `role="group"` rather than `role="grid"` because each item is
 already a focusable button; this avoids a broken grid/gridcell hierarchy. Its
@@ -502,17 +508,18 @@ without a `bot` flag default it to off.
 ### 5.8 How to play screen
 
 - Header with a back button and the title, then a scrollable rules document.
-- Covers goal, legal moves, capacities, cascade behaviour, multi-player
-  elimination, solo practice, the optional Bot and its three difficulties,
-  keyboard controls, and a strategy tip.
+- Covers goal, legal moves, capacities and the dashed next-orb slot, cascade
+  behaviour, multi-player elimination, solo practice, the optional Bot and its
+  three difficulties, keyboard controls, and a strategy tip.
 - Opened from the home screen or from the in-match menu; the back button
   returns to the opener.
 
 ### 5.9 About screen
 
-- App mark, name, and `Version 0.2.0`.
-- Describes one-device play, offline/privacy behaviour, the tech stack, and
-  credits.
+- App mark, name, `Version <package.json version>`, and `Last updated <date>`,
+  centred vertically.
+- A single **Visit website** button linking to
+  `muhib68442.github.io/Color-Wars`, opened in a new tab.
 - Opened from home; the back button returns home.
 
 ### 5.10 Dialog (`dialog.overlay`)
@@ -551,13 +558,14 @@ Behaviour:
 | Home, finished match | **New game** + links (no **Resume**), last-result note |
 | Empty cell | Grey circle with a border |
 | Player 1–4 cell | Solid custom colour, owner-specific orb pattern |
+| Armed cell | One orb from bursting; its next orb slot shows as a dashed outline (corners 2, edges 3, interior 4 capacity) |
 | Legal target | Pointer cursor, hover ring, press scale |
 | Illegal target | No pointer, `aria-disabled="true"` |
 | Active player | Card tint + ring + "playing" pill, coloured plain-text status |
-| Explosion | Source cell flashes and a coloured ring expands; orbs hop out one group at a time |
+| Explosion | Source cell is held full for a beat, then flashes and a coloured ring expands; orbs hop out one group at a time |
 | Transfer | Orb clone arcs to the target; the new orb pops in under a landing ring |
 | Capture | Target keeps the old owner colour while the orb flies, then cross-fades to the new colour when the orb lands |
-| Cascade replay | Each explosion waits for the previous group's flights and takeovers, then the next cell starts |
+| Cascade replay | Each explosion waits for the previous group's flights and takeovers, holds the filled cell for a beat, then the next cell starts |
 | Win | Status text + modal dialog; board locked |
 | Solo mode | One score card, status reads `Player N · solo practice`, never ends |
 | Bot turn | Status reads `Bot is thinking…`; board tab stops removed until the move lands |
@@ -599,8 +607,10 @@ model does not contain (the legacy "ghost coin" bug).
   board instead of rendering the final cascade up front. `src/ui/replay.ts`
   groups the events into one `place`/`add` step followed by one step per
   explosion (that `explode` plus the transfers it launched).
-  - Each explosion flashes its source cell, empties it, and emits an expanding
-    ring in the detonating player's colour.
+  - Each explosion holds its source cell full for a beat, then flashes,
+    empties it, and emits an expanding ring in the detonating player's colour.
+    The beat keeps the orb count that trips the blast readable, even in a
+    compressed cascade.
   - Transfers leave the source on a slow curved hop (560 ms base) with a short
     stagger between neighbours. Each arriving orb is applied to the replay
     snapshot only when its clone lands.

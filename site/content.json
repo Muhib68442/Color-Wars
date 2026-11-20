@@ -1,0 +1,106 @@
+{
+  "meta": {
+    "lang": "en",
+    "title": "Color Wars — a local chain reaction game",
+    "description": "Download Color Wars: a fast chain reaction game for one to four players on one device. No account, no ads, no internet needed.",
+    "themeColor": "#e6e6ea",
+    "themeColorDark": "#0f1115",
+    "favicon": "./assets/logo.svg"
+  },
+  "a11y": {
+    "skipLink": "Skip to content",
+    "navLabel": "Page sections",
+    "heroArtLabel": "A Color Wars board with coloured orbs",
+    "downloadNoteLabel": "Download details"
+  },
+  "brand": {
+    "name": "Color Wars",
+    "logo": "./assets/logo.svg",
+    "logoDark": "./assets/logo-dark.svg",
+    "logoAlt": "Color Wars logo",
+    "href": "#top"
+  },
+  "nav": [
+    { "label": "Features", "href": "#features" },
+    { "label": "Download", "href": "#download" }
+  ],
+  "hero": {
+    "eyebrow": "Pass-and-play · 1–4 players",
+    "title": "One board. Four colours. Endless cascades.",
+    "subtitle": "Place orbs, trigger explosions and be the last colour standing. Share one screen, play offline, and take the game wherever you go.",
+    "primaryCta": { "label": "Download for Android", "href": "#download" },
+    "secondaryCta": { "label": "See the features", "href": "#features" },
+    "facts": [
+      { "value": "1–4", "label": "Players" },
+      { "value": "7×7–15×15", "label": "Board sizes" },
+      { "value": "Offline", "label": "Always playable" }
+    ],
+    "previewBoard": [
+      { "tone": "p1", "orbs": 2 },
+      { "tone": "p2", "orbs": 1 },
+      null,
+      { "tone": "p2", "orbs": 3 },
+      { "tone": "p1", "orbs": 1 },
+      { "tone": "p4", "orbs": 2 },
+      null,
+      { "tone": "p3", "orbs": 2 },
+      { "tone": "p1", "orbs": 3 }
+    ]
+  },
+  "features": {
+    "eyebrow": "Why play",
+    "title": "Easy to learn. Hard to stop.",
+    "subtitle": "A few seconds per turn, but every move can flip the whole board.",
+    "items": [
+      {
+        "tone": "p1",
+        "title": "Pass and play",
+        "description": "Up to four players share one screen. Seats start on different sides so everyone gets a fair view of the board."
+      },
+      {
+        "tone": "p2",
+        "title": "Solo against the bot",
+        "description": "Practice alone with three difficulty levels. The hardest setting plays to win — bring your best cascades."
+      },
+      {
+        "tone": "p3",
+        "title": "Set it up your way",
+        "description": "Choose a 7×7 to 15×15 board, rename players, change colours, and switch sound, haptics or theme."
+      },
+      {
+        "tone": "p4",
+        "title": "Quiet and private",
+        "description": "No accounts, no ads, no tracking. Matches and settings stay on your device, so you can play with no connection."
+      }
+    ]
+  },
+  "download": {
+    "eyebrow": "Get the app",
+    "title": "Take Color Wars with you.",
+    "description": "Download the Android app, open the file and start a match. Nothing to sign up for.",
+    "url": "REPLACE_WITH_APK_URL",
+    "buttonLabel": "Download APK",
+    "comingSoonLabel": "Download coming soon",
+    "note": "Open the downloaded file to install. Android may ask you to allow installs from unknown sources.",
+    "metadataLabel": "Download details",
+    "metadata": [
+      { "label": "Version", "value": "1.0.2" },
+      { "label": "Size", "value": "~4.9 MB" },
+      { "label": "Updated", "value": "2026-11-20" },
+      { "label": "Requires", "value": "Android 7.0 or newer" }
+    ]
+  },
+  "footer": {
+    "text": "Made for quick matches and very big cascades.",
+    "links": [
+      { "label": "Website", "href": "https://muhib68442.github.io/Color-Wars" },
+      { "label": "Source code", "href": "https://github.com/muhib68442/Color-Wars" }
+    ],
+    "copyright": "© 2026 Color Wars. All rights reserved."
+  },
+  "errors": {
+    "title": "Site content could not be loaded",
+    "body": "Open this page from a local web server (not directly as a file) and make sure content.json is next to index.html.",
+    "button": "Try again"
+  }
+}

@@ -6,7 +6,7 @@ game feature maps to the Android shell, and the tests that gate a release.
 
 > **Status:** built. The engine, UI, settings, and save/resume are complete.
 > The Capacitor shell, app icon, versioning, and back-button controller are in
-> place, and the `1.0.1` debug APK has been produced.
+> place, and the `1.0.2` debug APK has been produced.
 >
 > For the exact Windows commands and the future release checklist, use
 > [`RELEASE.md`](RELEASE.md).
@@ -520,17 +520,19 @@ Enable R8 later only with a tested `mapping.txt` and a plugin smoke test.
 
 ```groovy
 defaultConfig {
-    versionCode 10001      // integer, must increase every upload
-    versionName "1.0.1"    // user-visible
+    versionCode 10002      // integer, must increase every upload
+    versionName "1.0.2"    // user-visible
 }
 ```
 
 This project derives both from `package.json` `version` instead of keeping a
 second copy in Gradle (see [`RELEASE.md`](RELEASE.md) §3.1):
 
-- `versionName` = `package.json` `version` (`1.0.1`).
-- `versionCode` = `major*10000 + minor*100 + patch` (`1.0.1` → `10001`).
+- `versionName` = `package.json` `version` (`1.0.2`).
+- `versionCode` = `major*10000 + minor*100 + patch` (`1.0.2` → `10002`).
 - The About screen uses the same version through Vite's `__APP_VERSION__`.
+- Its "Last updated" date comes from `__APP_UPDATED__`: the latest commit date
+  (`YYYY-MM-DD`), overridable with the `APP_UPDATED` environment variable.
 
 Bump `package.json` for every release. Never upload the same `versionCode`
 twice; keep the mapping recorded per release.
@@ -703,6 +705,6 @@ The Android app is releasable when:
 - Oracle JDK 19 is installed but **must not** be used for Gradle.
 - The engine, UI, settings, and save/resume work (Phase 0–2.5) and `dist/`
   builds. The Capacitor shell, icon sources, versioning, and back-button
-  controller are in place, and the `1.0.1` debug APK is built.
+  controller are in place, and the `1.0.2` debug APK is built.
 - Follow [`RELEASE.md`](RELEASE.md) §2 for the environment variables, §4 to
   rebuild, and §6 for the next release.

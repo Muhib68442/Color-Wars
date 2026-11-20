@@ -33,6 +33,8 @@ const TRANSFER_STAGGER_MS = 165;
 const EXPLODE_PULSE_MS = 400;
 /** Pause after the last orb of a group lands before the next cell explodes. */
 const LANDING_HOLD_MS = 180;
+/** Pause on the full cell right before it detonates. */
+const ARMED_HOLD_MS = 160;
 /** Pause after placing/adding the opening orb. */
 const PLACE_HOLD_MS = 360;
 /** Cross-fade from the old owner colour to the new one. */
@@ -86,6 +88,7 @@ function groupDuration(group: ReplayGroup): number {
       ? 0
       : (group.transfers.length - 1) * TRANSFER_STAGGER_MS;
   return (
+    ARMED_HOLD_MS +
     Math.max(EXPLODE_PULSE_MS, lastStart + FLIGHT_MS + TAKEOVER_MS) +
     LANDING_HOLD_MS
   );
@@ -511,6 +514,13 @@ export function playEvents(
         if (!(await clock.wait(scaled(PLACE_HOLD_MS, scale)))) return;
         continue;
       }
+
+      // Hold on the full cell before it clears. A compressed long cascade can
+      // otherwise flash past the orb that actually trips the detonation, which
+      // makes a 4-orb pop look like it happened at 3.
+      const armed = view.elementFor(group.lead.at);
+      if (armed !== null) animateCell(armed, "add", 0, scale, track);
+      if (!(await clock.wait(scaled(ARMED_HOLD_MS, scale)))) return;
 
       applyGameEvent(work, group.lead);
       callbacks.render(work);

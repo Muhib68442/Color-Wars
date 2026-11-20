@@ -5,8 +5,8 @@ Android APK. The design contract, supported versions, and device matrix live in
 [`ANDROID.md`](ANDROID.md); this file is the copy-paste checklist.
 
 > **Status:** built. The Android project, icons, splash screens, versioning, and
-> back-button adapter are in place. The debug APK for `1.0.1` was produced and
-> verified (package `com.muhib.colorwars`, version code `10001`).
+> back-button adapter are in place. The debug APK for `1.0.2` was produced and
+> verified (package `com.muhib.colorwars`, version code `10002`).
 > Follow §4 for routine rebuilds and §6 for the next release.
 >
 > Built artifact: `android/app/build/outputs/apk/debug/app-debug.apk`
@@ -19,8 +19,8 @@ Android APK. The design contract, supported versions, and device matrix live in
 | --- | --- | --- |
 | App name | `Color Wars` | `capacitor.config.ts` → `appName` |
 | Package ID | `com.muhib.colorwars` | `capacitor.config.ts` → `appId` (permanent) |
-| Version | `1.0.1` | `package.json` → `version` (single source of truth) |
-| Version code | `10001` | Derived from the version: `major*10000 + minor*100 + patch` |
+| Version | `1.0.2` | `package.json` → `version` (single source of truth) |
+| Version code | `10002` | Derived from the version: `major*10000 + minor*100 + patch` |
 | Icon | Home-screen logo | `assets/logo.svg` and `assets/logo-dark.svg` |
 | Web assets | `dist/` | Vite build, copied by `npx cap sync android` |
 | Debug APK | `android/app/build/outputs/apk/debug/app-debug.apk` | `npm run android:debug` |
@@ -28,7 +28,10 @@ Android APK. The design contract, supported versions, and device matrix live in
 | Release AAB | `android/app/build/outputs/bundle/release/app-release.aab` | `gradlew.bat bundleRelease` |
 
 The About screen reads the same `package.json` version through Vite, so the web
-and Android version strings can never disagree.
+and Android version strings can never disagree. Its "Last updated" line uses the
+latest commit date, or set `APP_UPDATED` (for example `APP_UPDATED=2026-11-14`)
+to override it for a release build. The screen also links to
+`https://muhib68442.github.io/Color-Wars`.
 
 The package ID **must never change** after the first Play Store upload. Changing
 it produces a different app with a different install base. The app name can
@@ -151,7 +154,7 @@ defaultConfig {
 }
 ```
 
-`1.0.1` therefore becomes version code `10001`. Keep versions plain
+`1.0.2` therefore becomes version code `10002`. Keep versions plain
 `major.minor.patch`; do not add `-beta` suffixes because the Gradle parser
 expects integers.
 
